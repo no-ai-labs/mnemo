@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# ChromaDB
+*.db
+*.sqlite
+mnemo_db/
+example_db/
+chains_db/
+tools_db/
+agent_db/
+workflow_db/
+
+# Environment
+.env
+.env.local
+
+# Legacy (backup)
+legacy/
