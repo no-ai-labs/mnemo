@@ -21,6 +21,8 @@ A modern memory system built on LangChain with ChromaDB, designed to work seamle
 - **🔌 MCP Compatible**: Full Model Context Protocol integration for Cursor
 - **🔍 Cross-Project Context Storage**: Build knowledge graphs across multiple projects
 - **🛡️ Minimal Guardrails for Vibe Coding**: Prevent duplicate implementations and maintain consistency
+- **🤖 Auto-Tracking**: Automatically tracks Git activities, code changes, and chat sessions
+- **📈 Code Intelligence**: Analyze patterns, find duplicates, check quality across projects
 
 ## 🏃 Quick Start
 
@@ -168,6 +170,24 @@ python -m mnemo.mcp.fastapi_server
 
 3. Restart Cursor and start using mnemo!
 
+### 📱 Available MCP Tools
+
+After installation, these tools are available in Cursor:
+
+#### Memory Tools
+- **remember**: Store information with semantic memory
+- **recall**: Retrieve the most relevant memory
+- **search**: Search through all memories
+- **forget**: Delete specific memories
+- **remember_code_pattern**: Store reusable code patterns
+- **session_status**: View current session tracking status
+
+#### Code Intelligence Tools (NEW!)
+- **analyze_project**: Build knowledge graph of any project
+- **find_pattern**: Find similar code patterns across projects
+- **compare_projects**: Compare coding patterns between projects
+- **check_guardrails**: Analyze code quality and detect issues
+
 ### 🔍 Auto-Tracking Features (NEW!)
 
 #### Project Tracking
@@ -254,6 +274,20 @@ patterns = manager.get_pattern_from_project("spring-app", "RestController")
 2. **Consistency**: Maintain coding standards across projects
 3. **Knowledge Transfer**: Learn from your best implementations
 4. **No More Vibe Coding**: AI understands your actual code, not just vibes
+
+### 🤖 MCP Integration
+
+All code intelligence features are exposed as MCP tools:
+
+```python
+# In Cursor, you can directly call:
+# - analyze_project(project_path, project_name, language)
+# - find_pattern(pattern, project)
+# - compare_projects(project1, project2)
+# - check_guardrails(project, checks)
+```
+
+No need for manual scripts - Cursor can use these tools automatically!
 
 ### 📈 What Gets Tracked
 
@@ -374,6 +408,8 @@ Check out the `examples/` directory for detailed usage examples:
 - [x] Cursor memory assistance integration
 - [x] Real-time memory sync
 - [x] Context injection for Cursor
+- [x] Auto-tracking (Git, code changes, sessions)
+- [x] Code intelligence tools via MCP
 
 ### Phase 2: Multi-Vector DB Support 🗄️
 - [x] ChromaDB (Current)
@@ -382,10 +418,13 @@ Check out the `examples/` directory for detailed usage examples:
 - [ ] Weaviate adapter
 - [ ] Abstract vector store interface
 
-### Phase 3: Knowledge Graph Support 🕸️
+### Phase 3: Knowledge Graph Support 🕸️ ✅
 - [ ] RDF/SPARQL support
-- [ ] Neo4j integration
-- [ ] Graph-based memory relationships
+- [x] Neo4j integration
+- [x] Graph-based memory relationships
+- [x] Code knowledge graphs
+- [x] Cross-project pattern analysis
+- [x] Vibe coding guardrails
 - [ ] Hybrid vector + graph search
 
 ### Phase 4: Advanced Features 🚀

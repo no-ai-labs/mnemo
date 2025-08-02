@@ -274,6 +274,119 @@ class ToolHandler:
                         "duration": {"type": "string"}
                     }
                 }
+            ),
+            
+            # Code Intelligence Tools
+            MCPTool(
+                name="analyze_project",
+                title="Analyze Project Code",
+                description="Analyze a project and build its code knowledge graph",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project_path": {"type": "string", "description": "Path to the project directory"},
+                        "project_name": {"type": "string", "description": "Name for the project in the graph"},
+                        "language": {
+                            "type": "string",
+                            "enum": ["python", "kotlin", "javascript", "typescript"],
+                            "description": "Primary language of the project"
+                        }
+                    },
+                    "required": ["project_path", "project_name"]
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "functions": {"type": "integer"},
+                        "calls": {"type": "integer"},
+                        "files": {"type": "integer"},
+                        "success": {"type": "boolean"}
+                    }
+                }
+            ),
+            
+            MCPTool(
+                name="find_pattern",
+                title="Find Code Pattern",
+                description="Find similar code patterns from analyzed projects",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "pattern": {"type": "string", "description": "Pattern to search for (e.g., 'authentication', 'error handling')"},
+                        "project": {"type": "string", "description": "Specific project to search in (optional)"}
+                    },
+                    "required": ["pattern"]
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "patterns": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "function": {"type": "string"},
+                                    "file": {"type": "string"},
+                                    "project": {"type": "string"}
+                                }
+                            }
+                        }
+                    }
+                }
+            ),
+            
+            MCPTool(
+                name="compare_projects",
+                title="Compare Projects",
+                description="Compare code patterns between two projects",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project1": {"type": "string", "description": "First project name"},
+                        "project2": {"type": "string", "description": "Second project name"}
+                    },
+                    "required": ["project1", "project2"]
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "similarity_score": {"type": "number"},
+                        "common_patterns": {"type": "integer"},
+                        "project1_stats": {"type": "object"},
+                        "project2_stats": {"type": "object"}
+                    }
+                }
+            ),
+            
+            MCPTool(
+                name="check_guardrails",
+                title="Check Code Guardrails",
+                description="Analyze code quality and detect vibe coding patterns",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project": {"type": "string", "description": "Project name to analyze"},
+                        "checks": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": ["duplicates", "unused", "patterns", "risks", "consistency", "complexity", "all"]
+                            },
+                            "description": "Specific checks to run (default: all)"
+                        }
+                    },
+                    "required": ["project"]
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "health_score": {"type": "integer"},
+                        "total_issues": {"type": "integer"},
+                        "critical_issues": {"type": "integer"},
+                        "recommendations": {"type": "array", "items": {"type": "string"}},
+                        "details": {"type": "object"}
+                    }
+                }
             )
         ]
     
@@ -383,8 +496,250 @@ class ToolHandler:
                     }
                 ],
                 "structuredContent": result
+                            }
+                
+        elif tool_name == "analyze_project":
+            project_path = arguments.get("project_path")
+            project_name = arguments.get("project_name")
+            language = arguments.get("language", "python")
+            
+            try:
+                # Import analyzers
+                if language == "python":
+                    from mnemo.graph.call_graph_builder import CallGraphBuilder
+                    builder = CallGraphBuilder()
+                    builder.build_from_directory(project_path, project_name)
+                    
+                    # Get stats
+                    stats = builder.graph.run("""
+                        MATCH (f:Function {project: $project})
+                        OPTIONAL MATCH (f)-[c:CALLS]->()
+                        RETURN count(DISTINCT f) as functions, 
+                               count(c) as calls,
+                               count(DISTINCT f.file_path) as files
+                    """, project=project_name).data()[0]
+                    
+                elif language == "kotlin":
+                    from mnemo.graph.kotlin_analyzer import KotlinAnalyzer
+                    analyzer = KotlinAnalyzer()
+                    result = analyzer.analyze_kotlin_project(project_path, project_name)
+                    stats = {
+                        'functions': result.get('files', 0),
+                        'calls': result.get('modules', 0),
+                        'files': result.get('files', 0)
+                    }
+                    
+                elif language in ["javascript", "typescript"]:
+                    from mnemo.graph.js_ts_analyzer import JSTypeScriptAnalyzer
+                    analyzer = JSTypeScriptAnalyzer()
+                    result = analyzer.analyze_frontend_project(project_path, project_name)
+                    stats = {
+                        'functions': result.get('components', 0),
+                        'calls': 0,
+                        'files': result.get('files', 0)
+                    }
+                else:
+                    stats = {'functions': 0, 'calls': 0, 'files': 0}
+                
+                result = {**stats, 'success': True}
+                
+            except Exception as e:
+                result = {
+                    'functions': 0,
+                    'calls': 0,
+                    'files': 0,
+                    'success': False,
+                    'error': str(e)
+                }
+                
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Analyzed {project_name}: {stats['functions']} functions, {stats['calls']} calls, {stats['files']} files"
+                    }
+                ],
+                "structuredContent": result
             }
-        
+            
+        elif tool_name == "find_pattern":
+            pattern = arguments.get("pattern")
+            project = arguments.get("project")
+            
+            try:
+                from mnemo.graph.project_context_manager import ProjectContextManager
+                manager = ProjectContextManager()
+                
+                patterns = []
+                if project:
+                    found = manager.get_pattern_from_project(project, pattern)
+                    for p in found:
+                        patterns.append({
+                            'function': p['function'],
+                            'file': p['file'],
+                            'project': project
+                        })
+                else:
+                    # Search all projects
+                    from py2neo import Graph
+                    graph = Graph("bolt://localhost:7687", auth=("neo4j", "password123"))
+                    results = graph.run("""
+                        MATCH (f:Function)
+                        WHERE toLower(f.name) CONTAINS toLower($pattern)
+                           OR toLower(f.full_name) CONTAINS toLower($pattern)
+                        RETURN f.full_name as function, f.file_path as file, f.project as project
+                        LIMIT 20
+                    """, pattern=pattern).data()
+                    
+                    patterns = [{'function': r['function'], 'file': r['file'], 'project': r['project']} 
+                               for r in results]
+                
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Found {len(patterns)} patterns matching '{pattern}'"
+                        }
+                    ],
+                    "structuredContent": {"patterns": patterns}
+                }
+                
+            except Exception as e:
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Error finding patterns: {str(e)}"
+                        }
+                    ],
+                    "structuredContent": {"patterns": []}
+                }
+                
+        elif tool_name == "compare_projects":
+            project1 = arguments.get("project1")
+            project2 = arguments.get("project2")
+            
+            try:
+                from mnemo.graph.project_context_manager import ProjectContextManager
+                manager = ProjectContextManager()
+                
+                comparison = manager.compare_projects(project1, project2)
+                
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Comparison: {project1} vs {project2} - Similarity: {comparison['similarity_score']:.2%}"
+                        }
+                    ],
+                    "structuredContent": comparison
+                }
+                
+            except Exception as e:
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Error comparing projects: {str(e)}"
+                        }
+                    ],
+                    "structuredContent": {
+                        "similarity_score": 0,
+                        "common_patterns": 0,
+                        "project1_stats": {},
+                        "project2_stats": {}
+                    }
+                }
+                
+        elif tool_name == "check_guardrails":
+            project = arguments.get("project")
+            checks = arguments.get("checks", ["all"])
+            
+            try:
+                from mnemo.graph.code_guardrails import CodeGuardrails
+                guardrails = CodeGuardrails()
+                
+                if "all" in checks:
+                    results = guardrails.analyze_project_health(project)
+                else:
+                    results = {
+                        'health_score': 100,
+                        'duplicates': [],
+                        'unused_functions': [],
+                        'strange_patterns': [],
+                        'potential_risks': [],
+                        'consistency_issues': [],
+                        'complexity_hotspots': []
+                    }
+                    
+                    if "duplicates" in checks:
+                        results['duplicates'] = guardrails.find_duplicate_implementations(project)
+                    if "unused" in checks:
+                        results['unused_functions'] = guardrails.find_unused_functions(project)
+                    if "patterns" in checks:
+                        results['strange_patterns'] = guardrails.detect_strange_patterns(project)
+                    if "risks" in checks:
+                        results['potential_risks'] = guardrails.detect_potential_risks(project)
+                    if "consistency" in checks:
+                        results['consistency_issues'] = guardrails.check_consistency(project)
+                    if "complexity" in checks:
+                        results['complexity_hotspots'] = guardrails.find_complexity_hotspots(project)
+                    
+                    # Recalculate health score
+                    total_issues = sum(len(v) for v in results.values() if isinstance(v, list))
+                    results['health_score'] = max(0, 100 - (total_issues * 5))
+                
+                # Count critical issues
+                critical_issues = 0
+                for issues in results.values():
+                    if isinstance(issues, list):
+                        critical_issues += sum(1 for issue in issues 
+                                             if isinstance(issue, dict) and issue.get('severity') == 'high')
+                
+                # Generate recommendations
+                recommendations = []
+                if results['health_score'] < 60:
+                    recommendations.append("Critical: Major refactoring needed")
+                if len(results.get('duplicates', [])) > 10:
+                    recommendations.append("Consolidate duplicate implementations")
+                if len(results.get('unused_functions', [])) > 20:
+                    recommendations.append("Remove dead code")
+                if critical_issues > 5:
+                    recommendations.append("Address high-severity issues immediately")
+                
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Health Score: {results['health_score']}/100 ({len(recommendations)} recommendations)"
+                        }
+                    ],
+                    "structuredContent": {
+                        "health_score": results['health_score'],
+                        "total_issues": sum(len(v) for v in results.values() if isinstance(v, list)),
+                        "critical_issues": critical_issues,
+                        "recommendations": recommendations,
+                        "details": results
+                    }
+                }
+                
+            except Exception as e:
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Error checking guardrails: {str(e)}"
+                        }
+                    ],
+                    "structuredContent": {
+                        "health_score": 0,
+                        "total_issues": 0,
+                        "critical_issues": 0,
+                        "recommendations": ["Error occurred"],
+                        "details": {}
+                    }
+                }
+                
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
 
