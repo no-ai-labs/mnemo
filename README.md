@@ -153,7 +153,11 @@ python -m mnemo.mcp.fastapi_server
 {
   "mcpServers": {
     "mnemo": {
-      "url": "http://localhost:3333/mcp"
+      "url": "http://localhost:3333/mcp",
+      "env": {
+        "MNEMO_AUTO_TRACKING": "true",
+        "MNEMO_TRACKING_INTERVAL": "300"
+      }
     }
   }
 }
@@ -164,6 +168,16 @@ python -m mnemo.mcp.fastapi_server
 @mnemo remember "project_info" "This is a FastAPI project with PostgreSQL"
 @mnemo recall "project info"
 ```
+
+### 🔍 Auto-Tracking Feature (NEW!)
+
+Mnemo now automatically tracks and remembers:
+- **Git commits**: New commits are automatically saved
+- **Code changes**: Significant code modifications are tracked  
+- **Branch switches**: Branch changes are recorded
+- **File status**: Working directory changes are monitored
+
+Auto-tracking runs every 5 minutes by default and stores everything in your memory!
 
 📚 **Detailed guides for beginners:**
 - [한국어 가이드](docs/CURSOR_MCP_GUIDE_KR.md) - Cursor 초보자를 위한 완벽 가이드

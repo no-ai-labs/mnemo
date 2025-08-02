@@ -16,6 +16,7 @@ from mnemo.memory.store import MnemoVectorStore
 from mnemo.memory.client import MnemoMemoryClient
 from mnemo.mcp.handlers import ResourceHandler, ToolHandler, PromptHandler
 from mnemo.mcp.types import MCPRequest, MCPResponse, MCPError
+from mnemo.mcp.auto_tracker import AutoProjectTracker
 
 
 class MCPRequestModel(BaseModel):
@@ -31,16 +32,19 @@ memory_client: Optional[MnemoMemoryClient] = None
 resource_handler: Optional[ResourceHandler] = None
 tool_handler: Optional[ToolHandler] = None
 prompt_handler: Optional[PromptHandler] = None
+auto_tracker: Optional[AutoProjectTracker] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize memory system on startup."""
-    global memory_client, resource_handler, tool_handler, prompt_handler
+    global memory_client, resource_handler, tool_handler, prompt_handler, auto_tracker
     
     # Get configuration from environment
     db_path = os.getenv("MNEMO_DB_PATH", "./mnemo_mcp_db")
     collection = os.getenv("MNEMO_COLLECTION", "cursor_memories")
+    auto_tracking = os.getenv("MNEMO_AUTO_TRACKING", "true").lower() == "true"
+    tracking_interval = int(os.getenv("MNEMO_TRACKING_INTERVAL", "300"))  # 5 minutes default
     
     # Initialize memory system
     vector_store = MnemoVectorStore(
@@ -54,14 +58,25 @@ async def lifespan(app: FastAPI):
     tool_handler = ToolHandler(memory_client)
     prompt_handler = PromptHandler(memory_client)
     
-    print(f"🚀 Mnemo MCP Server initialized")
+    # Initialize auto tracker
+    auto_tracker = AutoProjectTracker(memory_client)
+    
+    print(f"[MCP Server] Mnemo MCP Server initialized")
     print(f"   Database: {db_path}")
     print(f"   Collection: {collection}")
+    print(f"   Auto-tracking: {'Enabled' if auto_tracking else 'Disabled'}")
+    
+    # Start auto tracking if enabled
+    if auto_tracking:
+        await auto_tracker.start_tracking(tracking_interval)
     
     yield
     
     # Cleanup
-    print("👋 Shutting down Mnemo MCP Server")
+    if auto_tracker and auto_tracker.is_tracking:
+        await auto_tracker.stop_tracking()
+    
+    print("[MCP Server] Shutting down Mnemo MCP Server")
 
 
 app = FastAPI(
