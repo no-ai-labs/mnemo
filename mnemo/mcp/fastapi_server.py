@@ -16,7 +16,7 @@ from mnemo.memory.store import MnemoVectorStore
 from mnemo.memory.client import MnemoMemoryClient
 from mnemo.mcp.handlers import ResourceHandler, ToolHandler, PromptHandler
 from mnemo.mcp.types import MCPRequest, MCPResponse, MCPError
-from mnemo.mcp.auto_tracker import AutoProjectTracker
+from mnemo.mcp.auto_tracker import AutoProjectTracker, SessionMemoryTracker
 
 
 class MCPRequestModel(BaseModel):
@@ -33,18 +33,20 @@ resource_handler: Optional[ResourceHandler] = None
 tool_handler: Optional[ToolHandler] = None
 prompt_handler: Optional[PromptHandler] = None
 auto_tracker: Optional[AutoProjectTracker] = None
+session_tracker: Optional[SessionMemoryTracker] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize memory system on startup."""
-    global memory_client, resource_handler, tool_handler, prompt_handler, auto_tracker
+    global memory_client, resource_handler, tool_handler, prompt_handler, auto_tracker, session_tracker
     
     # Get configuration from environment
     db_path = os.getenv("MNEMO_DB_PATH", "./mnemo_mcp_db")
     collection = os.getenv("MNEMO_COLLECTION", "cursor_memories")
     auto_tracking = os.getenv("MNEMO_AUTO_TRACKING", "true").lower() == "true"
     tracking_interval = int(os.getenv("MNEMO_TRACKING_INTERVAL", "300"))  # 5 minutes default
+    session_tracking = os.getenv("MNEMO_SESSION_TRACKING", "true").lower() == "true"
     
     # Initialize memory system
     vector_store = MnemoVectorStore(
@@ -61,10 +63,15 @@ async def lifespan(app: FastAPI):
     # Initialize auto tracker
     auto_tracker = AutoProjectTracker(memory_client)
     
+    # Initialize session tracker
+    if session_tracking:
+        session_tracker = SessionMemoryTracker(memory_client)
+    
     print(f"[MCP Server] Mnemo MCP Server initialized")
     print(f"   Database: {db_path}")
     print(f"   Collection: {collection}")
     print(f"   Auto-tracking: {'Enabled' if auto_tracking else 'Disabled'}")
+    print(f"   Session tracking: {'Enabled' if session_tracking else 'Disabled'}")
     
     # Start auto tracking if enabled
     if auto_tracking:
@@ -139,7 +146,19 @@ async def handle_mcp_request(request: MCPRequestModel):
         elif request.method == "tools/call":
             tool_name = request.params.get("name")
             arguments = request.params.get("arguments", {})
+            
+            # Track session if enabled
+            if session_tracker and tool_name in ["remember", "recall", "search"]:
+                # Extract meaningful content from arguments
+                content = arguments.get("content") or arguments.get("query") or str(arguments)
+                session_tracker.add_message("user", f"Tool: {tool_name} - {content}", "tool_call")
+            
             result = await tool_handler.call_tool(tool_name, arguments)
+            
+            # Track result if session tracking enabled
+            if session_tracker and tool_name in ["remember", "recall", "search"]:
+                result_summary = str(result)[:200] if result else "No result"
+                session_tracker.add_message("assistant", f"Result: {result_summary}", "tool_result")
         
         elif request.method == "callTool":  # Legacy support
             tool_name = request.params.get("name")

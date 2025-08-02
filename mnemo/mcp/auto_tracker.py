@@ -124,19 +124,37 @@ class SessionMemoryTracker:
         self.memory_client = memory_client
         self.session_messages = []
         self.session_start = datetime.now()
+        self.session_id = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.max_messages_before_summary = 20
+        self.important_keywords = {
+            'decision', 'implement', 'change', 'fix', 'bug', 'feature',
+            'remember', 'important', 'todo', 'plan', 'design'
+        }
     
-    def add_message(self, role: str, content: str):
+    def add_message(self, role: str, content: str, message_type: str = "chat"):
         """Add a message to the session."""
-        self.session_messages.append({
+        message_data = {
             'timestamp': datetime.now().isoformat(),
             'role': role,
-            'content': content
-        })
+            'content': content,
+            'type': message_type,
+            'is_important': self._is_important_message(content)
+        }
+        
+        self.session_messages.append(message_data)
+        
+        # Save important messages immediately
+        if message_data['is_important']:
+            self._save_important_message(message_data)
         
         # Check if we need to create a summary
         if len(self.session_messages) >= self.max_messages_before_summary:
             self._save_session_summary()
+    
+    def _is_important_message(self, content: str) -> bool:
+        """Check if message contains important keywords."""
+        content_lower = content.lower()
+        return any(keyword in content_lower for keyword in self.important_keywords)
     
     def _save_session_summary(self):
         """Save a summary of the session."""
@@ -170,3 +188,31 @@ class SessionMemoryTracker:
         
         # Reset for next batch
         self.session_messages = self.session_messages[-5:]  # Keep last 5 for context
+    
+    def _save_important_message(self, message_data: Dict[str, Any]):
+        """Save an important message immediately."""
+        memory_key = f"important_message_{self.session_id}_{datetime.now().strftime('%H%M%S')}"
+        
+        memory_content = (
+            f"Important message in chat session\n"
+            f"Role: {message_data['role']}\n"
+            f"Time: {message_data['timestamp']}\n"
+            f"Content: {message_data['content'][:500]}"
+        )
+        
+        self.memory_client.remember(
+            key=memory_key,
+            content=memory_content,
+            memory_type="fact",
+            tags={"chat", "important", "session", self.session_id}
+        )
+    
+    def get_session_summary(self) -> Dict[str, Any]:
+        """Get current session summary."""
+        return {
+            'session_id': self.session_id,
+            'start_time': self.session_start.isoformat(),
+            'message_count': len(self.session_messages),
+            'important_messages': sum(1 for msg in self.session_messages if msg.get('is_important', False)),
+            'duration': str(datetime.now() - self.session_start)
+        }

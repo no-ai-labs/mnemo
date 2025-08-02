@@ -156,7 +156,8 @@ python -m mnemo.mcp.fastapi_server
       "url": "http://localhost:3333/mcp",
       "env": {
         "MNEMO_AUTO_TRACKING": "true",
-        "MNEMO_TRACKING_INTERVAL": "300"
+        "MNEMO_TRACKING_INTERVAL": "300",
+        "MNEMO_SESSION_TRACKING": "true"
       }
     }
   }
@@ -169,15 +170,25 @@ python -m mnemo.mcp.fastapi_server
 @mnemo recall "project info"
 ```
 
-### 🔍 Auto-Tracking Feature (NEW!)
+### 🔍 Auto-Tracking Features (NEW!)
 
-Mnemo now automatically tracks and remembers:
+#### Project Tracking
+Mnemo automatically tracks and remembers:
 - **Git commits**: New commits are automatically saved
 - **Code changes**: Significant code modifications are tracked  
 - **Branch switches**: Branch changes are recorded
 - **File status**: Working directory changes are monitored
 
-Auto-tracking runs every 5 minutes by default and stores everything in your memory!
+#### Session Tracking
+Mnemo also tracks your chat sessions:
+- **Important messages**: Messages with keywords like 'implement', 'fix', 'todo' are highlighted
+- **Session summaries**: Automatically saves conversation summaries every 20 messages
+- **Tool usage**: Tracks when and how you use mnemo tools
+
+Configuration:
+- `MNEMO_AUTO_TRACKING`: Enable/disable project tracking (default: "true")
+- `MNEMO_TRACKING_INTERVAL`: Tracking interval in seconds (default: 300)
+- `MNEMO_SESSION_TRACKING`: Enable/disable session tracking (default: "true")
 
 📚 **Detailed guides for beginners:**
 - [한국어 가이드](docs/CURSOR_MCP_GUIDE_KR.md) - Cursor 초보자를 위한 완벽 가이드

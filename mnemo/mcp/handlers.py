@@ -256,6 +256,24 @@ class ToolHandler:
                         "success": {"type": "boolean"}
                     }
                 }
+            ),
+            MCPTool(
+                name="session_status",
+                title="Get Session Status",
+                description="Get current chat session tracking status",
+                input_schema={
+                    "type": "object",
+                    "properties": {}
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "session_id": {"type": "string"},
+                        "message_count": {"type": "integer"},
+                        "important_messages": {"type": "integer"},
+                        "duration": {"type": "string"}
+                    }
+                }
             )
         ]
     
@@ -332,6 +350,31 @@ class ToolHandler:
                 description=arguments["description"]
             )
             result = {"memory_id": memory_id, "success": True}
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(result)
+                    }
+                ],
+                "structuredContent": result
+            }
+        
+        elif tool_name == "session_status":
+            # Import here to avoid circular dependency
+            from mnemo.mcp.fastapi_server import session_tracker
+            
+            if session_tracker:
+                summary = session_tracker.get_session_summary()
+                result = summary
+            else:
+                result = {
+                    "session_id": "none",
+                    "message_count": 0,
+                    "important_messages": 0,
+                    "duration": "0:00:00"
+                }
+            
             return {
                 "content": [
                     {
