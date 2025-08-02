@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "mnemo": {
+      "command": "python",
+      "args": ["-m", "mnemo.mcp.stdio"],
+      "env": {
+        "MNEMO_DB_PATH": "./mnemo_mcp_db",
+        "MNEMO_COLLECTION": "cursor_memories"
+      }
+    }
+  }
+}

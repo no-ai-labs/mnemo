@@ -8,15 +8,17 @@ setup(
     author_email="contact@devhub.com",
     packages=find_packages(),
     python_requires=">=3.11",
-    install_requires=[
+        install_requires=[
         "langchain>=0.1.0",
-        "langchain-community>=0.0.10",
+        "langchain-community>=0.0.10", 
         "langchain-openai>=0.0.5",
+        "langchain-huggingface>=0.1.0",
         "chromadb>=0.4.0",
         "pydantic>=2.0",
         "typer>=0.9.0",
         "rich>=13.0",
         "sqlite-utils>=3.0",
+        "sentence-transformers>=2.2.0",
     ],
     extras_require={
         "dev": [
@@ -31,7 +33,7 @@ setup(
             "langsmith>=0.0.80",
         ],
         "mcp": [
-            "mcp>=1.0.0",
+            "structlog>=23.0",
         ],
         "all": [
             "langgraph>=0.0.20",
@@ -43,6 +45,8 @@ setup(
     entry_points={
         "console_scripts": [
             "mnemo=mnemo.cli:main",
+            "mnemo-mcp=mnemo.mcp.cli:app",
+            "mnemo-mcp-stdio=mnemo.mcp.stdio:main",
         ],
     },
     classifiers=[

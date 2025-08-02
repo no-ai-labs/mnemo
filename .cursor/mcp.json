@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "mnemo": {
+      "command": "/Users/devhub/miniconda3/envs/mnemo/bin/python",
+      "args": ["-m", "mnemo.mcp.stdio"],
+      "env": {
+        "MNEMO_DB_PATH": "/Users/devhub/dev/mnemo/cursor_memories",
+        "MNEMO_COLLECTION": "cursor_ai_memories"
+      }
+    }
+  }
+}

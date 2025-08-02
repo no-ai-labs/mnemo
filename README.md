@@ -9,12 +9,16 @@ A modern memory system built on LangChain with ChromaDB, designed to work seamle
 
 - **🔗 LangChain-Powered**: Built on LangChain for seamless integration
 - **🧠 Vector Memory**: ChromaDB-based semantic memory with embeddings
+- **🤖 Flexible Embeddings**: Choose from multiple embedding models:
+  - Qwen3-Embedding-0.6B (lightweight, M3 optimized)
+  - E5-Large (high quality, multilingual)
+  - OpenAI (if API key available)
 - **⛓️ Memory Chains**: Pre-built LangChain chains for memory-enhanced conversations
 - **🛠️ LangChain Tools**: Memory tools for agents and complex workflows
 - **📊 LangGraph Support**: Optional advanced workflows for complex scenarios
 - **🎯 RAG Capabilities**: Retrieval-Augmented Generation with memory
 - **🏷️ Rich Metadata**: Type-safe memory with tags, scopes, and priorities
-- **🔌 MCP Compatible**: Designed for Model Context Protocol integration
+- **🔌 MCP Compatible**: Full Model Context Protocol integration for Cursor
 
 ## 🏃 Quick Start
 
@@ -31,6 +35,9 @@ pip install -e .
 # With optional dependencies
 pip install -e ".[graph]"  # For LangGraph workflows
 pip install -e ".[all]"    # Everything included
+
+# For MCP support with Cursor
+pip install -e ".[mcp]"
 ```
 
 ### Basic Usage
@@ -102,6 +109,60 @@ mnemo stats
 - **Project**: Available in current project
 - **Session**: Available in current session
 - **Temporary**: Auto-expires
+
+## 🤖 Embedding Models
+
+Mnemo supports multiple embedding models for different use cases:
+
+### Recommended Models
+- **Qwen3-Embedding-0.6B** ⭐: Best for M3/M2 Macs, lightweight (2GB), 100+ languages
+- **intfloat/multilingual-e5-large**: High quality, 1024 dims, 3GB memory
+- **paraphrase-multilingual-mpnet-base-v2**: Balanced performance, 768 dims
+
+### Configuration
+```python
+# Use Qwen3 (default, lightweight)
+from mnemo.core.embeddings import MnemoEmbeddings
+embeddings = MnemoEmbeddings()  # Uses Qwen3-0.6B by default
+
+# Use E5-Large (higher quality)
+embeddings = MnemoEmbeddings(
+    sentence_transformer_model="intfloat/multilingual-e5-large"
+)
+
+# Use OpenAI (requires API key)
+embeddings = MnemoEmbeddings(
+    use_mock=False,  # Force OpenAI if available
+    openai_api_key="your-key"
+)
+```
+
+## 🔌 MCP Integration (Cursor)
+
+### Quick Setup
+1. Add to `.cursor/mcp.json`:
+```json
+{
+  "mcpServers": {
+    "mnemo": {
+      "command": "/path/to/python",
+      "args": ["-m", "mnemo.mcp.stdio"],
+      "env": {
+        "MNEMO_DB_PATH": "./cursor_memories",
+        "MNEMO_COLLECTION": "cursor_ai_memories"
+      }
+    }
+  }
+}
+```
+
+2. Restart Cursor
+
+3. Use in Cursor:
+```
+@mnemo remember "project_info" "This is a FastAPI project with PostgreSQL"
+@mnemo recall "project info"
+```
 
 ## 🏗️ Architecture
 

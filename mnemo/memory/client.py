@@ -128,23 +128,41 @@ class MnemoMemoryClient:
         # Convert to simple dict format
         formatted_results = []
         for memory_doc, score in results:
-            # Update access tracking
-            memory_doc.update_access()
-            self.vector_store.update_memory(
-                memory_doc.memory_id,
-                new_metadata=memory_doc.memory_metadata
-            )
-            
-            formatted_results.append({
-                "memory_id": memory_doc.memory_id,
-                "content": memory_doc.page_content,
-                "type": memory_doc.memory_metadata.memory_type.value,
-                "scope": memory_doc.memory_metadata.scope.value,
-                "tags": list(memory_doc.memory_metadata.tags),
-                "created_at": memory_doc.memory_metadata.created_at.isoformat(),
-                "similarity_score": score,
-                "relevance_score": memory_doc.memory_metadata.relevance_score
-            })
+            # Check if memory_doc is None (shouldn't happen, but safety check)
+            if memory_doc is None:
+                continue
+                
+            # Check if it has memory_metadata attribute
+            if hasattr(memory_doc, 'memory_metadata') and memory_doc.memory_metadata:
+                # Update access tracking
+                memory_doc.update_access()
+                self.vector_store.update_memory(
+                    memory_doc.memory_id,
+                    new_metadata=memory_doc.memory_metadata
+                )
+                
+                formatted_results.append({
+                    "memory_id": memory_doc.memory_id,
+                    "content": memory_doc.page_content,
+                    "type": memory_doc.memory_metadata.memory_type.value,
+                    "scope": memory_doc.memory_metadata.scope.value,
+                    "tags": list(memory_doc.memory_metadata.tags),
+                    "created_at": memory_doc.memory_metadata.created_at.isoformat(),
+                    "similarity_score": score,
+                    "relevance_score": memory_doc.memory_metadata.relevance_score
+                })
+            else:
+                # Fallback for documents without proper metadata
+                formatted_results.append({
+                    "memory_id": getattr(memory_doc, 'memory_id', 'unknown'),
+                    "content": memory_doc.page_content,
+                    "type": "unknown",
+                    "scope": "unknown",
+                    "tags": [],
+                    "created_at": datetime.now().isoformat(),
+                    "similarity_score": score,
+                    "relevance_score": 0.0
+                })
         
         return formatted_results
     
