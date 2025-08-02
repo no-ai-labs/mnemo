@@ -739,6 +739,76 @@ class ToolHandler:
                         "details": {}
                     }
                 }
+        
+        elif tool_name == "visualize_graph":
+            project = arguments.get("project")
+            viz_type = arguments.get("visualization_type", "dashboard")
+            pattern = arguments.get("pattern")
+            output_dir = arguments.get("output_dir", "kg_output")
+            
+            try:
+                from mnemo.graph.kg_visualizer import KnowledgeGraphVisualizer
+                import os
+                
+                # Create output directory
+                os.makedirs(output_dir, exist_ok=True)
+                
+                viz = KnowledgeGraphVisualizer()
+                
+                if viz_type == "project":
+                    file_path = viz.visualize_project(project, os.path.join(output_dir, "project_graph.html"))
+                elif viz_type == "pattern" and pattern:
+                    file_path = viz.visualize_pattern_search(pattern, project, os.path.join(output_dir, "pattern_graph.html"))
+                elif viz_type == "health":
+                    file_path = viz.visualize_code_health(project, os.path.join(output_dir, "health_graph.html"))
+                elif viz_type == "dashboard":
+                    file_path = viz.create_interactive_dashboard(project, os.path.join(output_dir, "dashboard"))
+                else:
+                    return {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Invalid visualization type or missing pattern"
+                            }
+                        ],
+                        "structuredContent": {
+                            "file_path": "",
+                            "visualization_type": viz_type,
+                            "success": False,
+                            "message": "Invalid parameters"
+                        }
+                    }
+                
+                abs_path = os.path.abspath(file_path)
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Visualization created successfully!\nType: {viz_type}\nFile: {abs_path}\nOpen in browser: file://{abs_path}"
+                        }
+                    ],
+                    "structuredContent": {
+                        "file_path": abs_path,
+                        "visualization_type": viz_type,
+                        "success": True,
+                        "message": f"Visualization saved to {abs_path}"
+                    }
+                }
+            except Exception as e:
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Error creating visualization: {str(e)}"
+                        }
+                    ],
+                    "structuredContent": {
+                        "file_path": "",
+                        "visualization_type": viz_type,
+                        "success": False,
+                        "message": str(e)
+                    }
+                }
                 
         else:
             raise ValueError(f"Unknown tool: {tool_name}")

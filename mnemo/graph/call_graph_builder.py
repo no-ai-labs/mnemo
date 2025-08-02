@@ -47,6 +47,8 @@ class CallGraphVisitor(ast.NodeVisitor):
         self.functions: List[FunctionInfo] = []
         self.calls: List[CallInfo] = []
         self.imports: Dict[str, str] = {}  # alias -> full_module_name
+        self.class_bases: Dict[str, List[str]] = {}  # class -> base classes
+        self.decorators: List[CallInfo] = []
         
     def visit_Import(self, node: ast.Import):
         """Track imports."""
@@ -72,6 +74,48 @@ class CallGraphVisitor(ast.NodeVisitor):
         """Enter class definition."""
         old_class = self.current_class
         self.current_class = node.name
+        
+        # Add the class itself as a "function" node (for graph purposes)
+        class_info = FunctionInfo(
+            name=node.name,
+            module=self.module_name,
+            file_path=self.file_path,
+            line_number=node.lineno,
+            class_name=None,  # Classes don't belong to other classes
+            is_method=False,
+            params=[]
+        )
+        self.functions.append(class_info)
+        
+        # Track base classes (inheritance)
+        bases = []
+        for base in node.bases:
+            base_name = self._extract_callee(base)
+            if base_name:
+                bases.append(base_name)
+                # Add inheritance as a special call
+                call_info = CallInfo(
+                    caller=f"{self.module_name}.{node.name}",
+                    callee=base_name,
+                    line_number=node.lineno,
+                    call_type='inherits'
+                )
+                self.calls.append(call_info)
+        
+        self.class_bases[node.name] = bases
+        
+        # Process decorators
+        for decorator in node.decorator_list:
+            dec_name = self._extract_callee(decorator)
+            if dec_name:
+                call_info = CallInfo(
+                    caller=f"{self.module_name}.{node.name}",
+                    callee=dec_name,
+                    line_number=decorator.lineno,
+                    call_type='decorator'
+                )
+                self.decorators.append(call_info)
+        
         self.generic_visit(node)
         self.current_class = old_class
         
@@ -93,6 +137,19 @@ class CallGraphVisitor(ast.NodeVisitor):
         # Track current function for calls
         old_function = self.current_function
         self.current_function = func_info.full_name
+        
+        # Process decorators
+        for decorator in node.decorator_list:
+            dec_name = self._extract_callee(decorator)
+            if dec_name:
+                call_info = CallInfo(
+                    caller=self.current_function,
+                    callee=dec_name,
+                    line_number=decorator.lineno,
+                    call_type='decorator'
+                )
+                self.calls.append(call_info)
+        
         self.generic_visit(node)
         self.current_function = old_function
         
@@ -115,6 +172,43 @@ class CallGraphVisitor(ast.NodeVisitor):
             self.calls.append(call_info)
             
         self.generic_visit(node)
+    
+    def visit_ListComp(self, node):
+        """Track calls in list comprehensions."""
+        self._visit_comprehension(node)
+        
+    def visit_DictComp(self, node):
+        """Track calls in dict comprehensions."""
+        self._visit_comprehension(node)
+        
+    def visit_SetComp(self, node):
+        """Track calls in set comprehensions."""
+        self._visit_comprehension(node)
+        
+    def visit_GeneratorExp(self, node):
+        """Track calls in generator expressions."""
+        self._visit_comprehension(node)
+        
+    def _visit_comprehension(self, node):
+        """Helper to visit comprehensions."""
+        self.generic_visit(node)
+    
+    def visit_With(self, node):
+        """Track context manager calls."""
+        if self.current_function:
+            for item in node.items:
+                if isinstance(item.context_expr, ast.Call):
+                    callee = self._extract_callee(item.context_expr.func)
+                    if callee:
+                        call_info = CallInfo(
+                            caller=self.current_function,
+                            callee=callee,
+                            line_number=node.lineno,
+                            call_type='context_manager'
+                        )
+                        self.calls.append(call_info)
+        
+        self.generic_visit(node)
         
     def _extract_callee(self, node) -> Optional[str]:
         """Extract the name of the called function."""
@@ -133,7 +227,48 @@ class CallGraphVisitor(ast.NodeVisitor):
                 return f"{value}.{node.attr}"
             return node.attr
             
+        elif isinstance(node, ast.Call):
+            # Chained calls like func().method()
+            return self._extract_callee(node.func)
+            
+        elif isinstance(node, ast.Subscript):
+            # Subscript like dict[key]
+            return self._extract_callee(node.value)
+            
         return None
+    
+    def visit_Assign(self, node):
+        """Track assignments that might be function references."""
+        if self.current_function:
+            # Check if we're assigning a function
+            if isinstance(node.value, ast.Call):
+                callee = self._extract_callee(node.value.func)
+                if callee:
+                    call_info = CallInfo(
+                        caller=self.current_function,
+                        callee=callee,
+                        line_number=node.lineno,
+                        call_type='assignment'
+                    )
+                    self.calls.append(call_info)
+        
+        self.generic_visit(node)
+    
+    def visit_Return(self, node):
+        """Track function calls in return statements."""
+        if self.current_function and node.value:
+            if isinstance(node.value, ast.Call):
+                callee = self._extract_callee(node.value.func)
+                if callee:
+                    call_info = CallInfo(
+                        caller=self.current_function,
+                        callee=callee,
+                        line_number=node.lineno,
+                        call_type='return'
+                    )
+                    self.calls.append(call_info)
+        
+        self.generic_visit(node)
 
 
 class CallGraphBuilder:
@@ -143,6 +278,7 @@ class CallGraphBuilder:
                  username: str = "neo4j", 
                  password: str = "password123"):
         self.graph = Graph(neo4j_uri, auth=(username, password))
+        self.classes = []  # Track classes separately
         
     def build_from_directory(self, directory: str, project_name: str) -> None:
         """Build call graph from a directory of Python files."""
@@ -189,6 +325,9 @@ class CallGraphBuilder:
             visitor = CallGraphVisitor(module_name, str(file_path))
             visitor.visit(tree)
             
+            # Add decorator calls
+            visitor.calls.extend(visitor.decorators)
+            
             return visitor.functions, visitor.calls
             
         except Exception as e:
@@ -201,8 +340,16 @@ class CallGraphBuilder:
         function_nodes = {}
         
         for func in functions:
+            # Determine node type
+            if func.class_name is None and not func.is_method:
+                # This is either a top-level function or a class
+                # Check if it's likely a class (capitalized name)
+                node_type = 'Class' if func.name and func.name[0].isupper() else 'Function'
+            else:
+                node_type = 'Method' if func.is_method else 'Function'
+            
             node = Node(
-                "Function",
+                "Function",  # Keep as Function for queries
                 name=func.name,
                 full_name=func.full_name,
                 module=func.module,
@@ -211,23 +358,47 @@ class CallGraphBuilder:
                 class_name=func.class_name,
                 is_method=func.is_method,
                 params=func.params or [],
-                project=project_name
+                project=project_name,
+                node_type=node_type  # Add this for visualization
             )
             self.graph.create(node)
             function_nodes[func.full_name] = node
             
         # Create call relationships
+        relationship_count = 0
         for call in calls:
-            if call.caller in function_nodes and call.callee in function_nodes:
+            if call.caller in function_nodes:
                 caller_node = function_nodes[call.caller]
-                callee_node = function_nodes[call.callee]
                 
-                rel = Relationship(
-                    caller_node, "CALLS", callee_node,
-                    line_number=call.line_number,
-                    call_type=call.call_type
-                )
-                self.graph.create(rel)
+                # Try to find the callee with different strategies
+                callee_node = None
+                
+                # 1. Exact match
+                if call.callee in function_nodes:
+                    callee_node = function_nodes[call.callee]
+                else:
+                    # 2. Try to find by name in the same module
+                    caller_module = call.caller.rsplit('.', 1)[0]
+                    potential_callee = f"{caller_module}.{call.callee}"
+                    if potential_callee in function_nodes:
+                        callee_node = function_nodes[potential_callee]
+                    else:
+                        # 3. Try to find by short name anywhere in the project
+                        for func_name, node in function_nodes.items():
+                            if func_name.endswith(f'.{call.callee}') or func_name == call.callee:
+                                callee_node = node
+                                break
+                
+                if callee_node:
+                    rel = Relationship(
+                        caller_node, "CALLS", callee_node,
+                        line_number=call.line_number,
+                        call_type=call.call_type
+                    )
+                    self.graph.create(rel)
+                    relationship_count += 1
+        
+        print(f"[CALL-GRAPH] Created {relationship_count} relationships from {len(calls)} calls")
                 
         print(f"[CALL-GRAPH] Stored {len(function_nodes)} functions in Neo4j")
         
