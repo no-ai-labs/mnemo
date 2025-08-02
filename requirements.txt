@@ -19,3 +19,9 @@ mypy>=1.5.0
 langgraph>=0.0.20  # For advanced graph workflows
 langsmith>=0.0.80  # For LangSmith integration
 mcp>=1.0.0  # For MCP integration
+
+# Code Intelligence dependencies
+py2neo>=2021.2.3  # For Neo4j graph database
+watchdog>=3.0.0  # For file system monitoring
+fastapi>=0.104.0  # For MCP HTTP server
+uvicorn>=0.24.0  # For running FastAPI

@@ -19,6 +19,8 @@ A modern memory system built on LangChain with ChromaDB, designed to work seamle
 - **🎯 RAG Capabilities**: Retrieval-Augmented Generation with memory
 - **🏷️ Rich Metadata**: Type-safe memory with tags, scopes, and priorities
 - **🔌 MCP Compatible**: Full Model Context Protocol integration for Cursor
+- **🔍 Cross-Project Context Storage**: Build knowledge graphs across multiple projects
+- **🛡️ Minimal Guardrails for Vibe Coding**: Prevent duplicate implementations and maintain consistency
 
 ## 🏃 Quick Start
 
@@ -189,6 +191,77 @@ Configuration:
 📚 **Detailed guides for beginners:**
 - [한국어 가이드](docs/CURSOR_MCP_GUIDE_KR.md) - Cursor 초보자를 위한 완벽 가이드
 - [English Guide](docs/CURSOR_MCP_GUIDE_EN.md) - Complete guide for Cursor beginners
+
+## 🔍 Cross-Project Context & Code Intelligence (NEW!)
+
+### Why Cross-Project Context?
+
+When AI assistants like Cursor work on multiple projects, they often "vibe code" - creating duplicate implementations, using different libraries for the same features, or ignoring existing patterns. Mnemo solves this with **knowledge graphs** that capture and reuse patterns across all your projects.
+
+### 🛡️ Minimal Guardrails for Vibe Coding
+
+Stop AI from:
+- **Reinventing the wheel**: "You already have CustomError in errors.py!"
+- **Library chaos**: "This project uses requests, not urllib"
+- **Style drift**: "Keep using snake_case like the rest of the codebase"
+
+### 📊 Code Knowledge Graph with Neo4j
+
+Build a searchable graph of your codebase:
+
+```bash
+# Start Neo4j
+docker-compose -f docker-compose/docker-compose.yml up -d
+
+# Analyze a Python project
+from mnemo.graph.call_graph_builder import CallGraphBuilder
+
+builder = CallGraphBuilder()
+builder.build_from_directory("./my-project", "my-project-name")
+```
+
+### 🌍 Multi-Language Support
+
+Currently supported:
+- **Python** (.py) - Full AST analysis, function calls, imports
+- **Kotlin** (.kt) - Classes, functions, Gradle modules
+- **JavaScript/TypeScript** (.js/.ts/.jsx/.tsx) - ES6/CommonJS, Vue/React components
+- **More coming soon**: Java, Go, Rust, C++
+
+### 🔄 Real-World Example
+
+```python
+# Analyze multiple projects
+from mnemo.graph.project_context_manager import ProjectContextManager
+
+manager = ProjectContextManager()
+
+# Analyze your Spring Boot backend
+manager.analyze_project("/path/to/spring-app", "spring-app", "java")
+
+# Analyze your React frontend  
+manager.analyze_project("/path/to/react-app", "react-app", "javascript")
+
+# Later, when working on a new FastAPI project:
+# "Create REST endpoints like my Spring Boot project"
+patterns = manager.get_pattern_from_project("spring-app", "RestController")
+# → AI references actual Spring patterns and adapts them to FastAPI!
+```
+
+### 🎯 Key Benefits
+
+1. **Pattern Reuse**: "Use the same auth pattern as project X"
+2. **Consistency**: Maintain coding standards across projects
+3. **Knowledge Transfer**: Learn from your best implementations
+4. **No More Vibe Coding**: AI understands your actual code, not just vibes
+
+### 📈 What Gets Tracked
+
+- **Function/Method calls** - Who calls whom
+- **Class hierarchies** - Inheritance and interfaces  
+- **Dependencies** - What imports what
+- **Patterns** - Common architectural patterns
+- **Cross-references** - How projects relate
 
 ## 🏗️ Architecture
 

@@ -26,7 +26,7 @@ build/
 htmlcov/
 .pytest_cache/
 
-# ChromaDB
+# ChromaDB / Vector Stores
 *.db
 *.sqlite
 *.sqlite3
@@ -39,6 +39,20 @@ chains_db/
 tools_db/
 agent_db/
 workflow_db/
+test_branch_db/
+test_tracking_db/
+project_context_db/
+mentat_analysis_db/
+
+# Neo4j
+docker-compose/neo4j/
+
+# Test files
+test_rle.txt
+test.txt
+
+# Temporary directories
+/tmp/
 
 # Environment
 .env
