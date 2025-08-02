@@ -164,6 +164,10 @@ embeddings = MnemoEmbeddings(
 @mnemo recall "project info"
 ```
 
+📚 **Detailed guides for beginners:**
+- [한국어 가이드](docs/CURSOR_MCP_GUIDE_KR.md) - Cursor 초보자를 위한 완벽 가이드
+- [English Guide](docs/CURSOR_MCP_GUIDE_EN.md) - Complete guide for Cursor beginners
+
 ## 🏗️ Architecture
 
 ```
