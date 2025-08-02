@@ -164,11 +164,7 @@ python -m mnemo.mcp.fastapi_server
 }
 ```
 
-3. Restart Cursor and use:
-```
-@mnemo remember "project_info" "This is a FastAPI project with PostgreSQL"
-@mnemo recall "project info"
-```
+3. Restart Cursor and start using mnemo!
 
 ### 🔍 Auto-Tracking Features (NEW!)
 
@@ -300,11 +296,11 @@ Check out the `examples/` directory for detailed usage examples:
 
 ## 🗺️ Roadmap
 
-### Phase 1: MCP Integration 🔌
-- [ ] MCP server implementation
-- [ ] Cursor memory assistance integration
-- [ ] Real-time memory sync
-- [ ] Context injection for Cursor
+### Phase 1: MCP Integration 🔌 ✅
+- [x] MCP server implementation
+- [x] Cursor memory assistance integration
+- [x] Real-time memory sync
+- [x] Context injection for Cursor
 
 ### Phase 2: Multi-Vector DB Support 🗄️
 - [x] ChromaDB (Current)
