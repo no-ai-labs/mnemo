@@ -165,6 +165,13 @@ class ToolHandler:
                         }
                     },
                     "required": ["key", "content"]
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "memory_id": {"type": "string"},
+                        "success": {"type": "boolean"}
+                    }
                 }
             ),
             
@@ -177,6 +184,13 @@ class ToolHandler:
                         "query": {"type": "string", "description": "Search query"}
                     },
                     "required": ["query"]
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "content": {"type": "string"},
+                        "found": {"type": "boolean"}
+                    }
                 }
             ),
             
@@ -194,6 +208,13 @@ class ToolHandler:
                         "limit": {"type": "integer", "default": 10}
                     },
                     "required": ["query"]
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "results": {"type": "array"},
+                        "count": {"type": "integer"}
+                    }
                 }
             ),
             
@@ -206,6 +227,12 @@ class ToolHandler:
                         "memory_id": {"type": "string", "description": "Memory ID to delete"}
                     },
                     "required": ["memory_id"]
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"}
+                    }
                 }
             ),
             
@@ -221,6 +248,13 @@ class ToolHandler:
                         "description": {"type": "string"}
                     },
                     "required": ["pattern_name", "code", "language", "description"]
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "memory_id": {"type": "string"},
+                        "success": {"type": "boolean"}
+                    }
                 }
             )
         ]
@@ -236,11 +270,29 @@ class ToolHandler:
                 memory_type=arguments.get("memory_type", "fact"),
                 tags=tags
             )
-            return {"memory_id": memory_id, "success": True}
+            result = {"memory_id": memory_id, "success": True}
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(result)
+                    }
+                ],
+                "structuredContent": result
+            }
         
         elif tool_name == "recall":
             content = self.memory_client.recall(arguments["query"])
-            return {"content": content, "found": content is not None}
+            result = {"content": content, "found": content is not None}
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(result)
+                    }
+                ],
+                "structuredContent": result
+            }
         
         elif tool_name == "search":
             results = self.memory_client.search(
@@ -248,11 +300,29 @@ class ToolHandler:
                 memory_types=arguments.get("memory_types"),
                 limit=arguments.get("limit", 10)
             )
-            return {"results": results, "count": len(results)}
+            result = {"results": results, "count": len(results)}
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(result)
+                    }
+                ],
+                "structuredContent": result
+            }
         
         elif tool_name == "forget":
             success = self.memory_client.forget(arguments["memory_id"])
-            return {"success": success}
+            result = {"success": success}
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(result)
+                    }
+                ],
+                "structuredContent": result
+            }
         
         elif tool_name == "remember_code_pattern":
             memory_id = self.memory_client.remember_code_pattern(
@@ -261,7 +331,16 @@ class ToolHandler:
                 language=arguments["language"],
                 description=arguments["description"]
             )
-            return {"memory_id": memory_id, "success": True}
+            result = {"memory_id": memory_id, "success": True}
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(result)
+                    }
+                ],
+                "structuredContent": result
+            }
         
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
@@ -279,7 +358,18 @@ class PromptHandler:
             MCPPrompt(
                 name="memory_enhanced_response",
                 description="Generate a response using relevant memories",
-                arguments=["query", "context"],
+                arguments=[
+                    {
+                        "name": "query",
+                        "description": "The user's query or question",
+                        "required": True
+                    },
+                    {
+                        "name": "context",
+                        "description": "Additional context for the response",
+                        "required": False
+                    }
+                ],
                 template="""Based on the following memories and context, provide a helpful response:
 
 Relevant Memories:
@@ -295,7 +385,18 @@ Response:"""
             MCPPrompt(
                 name="code_generation_with_patterns",
                 description="Generate code using stored patterns",
-                arguments=["task", "language"],
+                arguments=[
+                    {
+                        "name": "task",
+                        "description": "The coding task to accomplish",
+                        "required": True
+                    },
+                    {
+                        "name": "language",
+                        "description": "The programming language to use",
+                        "required": True
+                    }
+                ],
                 template="""Generate code for the following task using these patterns as reference:
 
 Code Patterns:
@@ -310,7 +411,13 @@ Generated Code:"""
             MCPPrompt(
                 name="knowledge_synthesis",
                 description="Synthesize knowledge from multiple memories",
-                arguments=["topic"],
+                arguments=[
+                    {
+                        "name": "topic",
+                        "description": "The topic to synthesize knowledge about",
+                        "required": True
+                    }
+                ],
                 template="""Synthesize the following memories about {topic}:
 
 Memories:

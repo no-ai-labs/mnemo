@@ -140,42 +140,37 @@ touch mcp.json  # macOS/Linux
 echo {} > mcp.json  # Windows
 ```
 
-### 3. mcp.json 설정하기
+### 3. MCP 서버 실행하기 🚀
 
-`~/.cursor/mcp.json` 파일을 열고 다음 내용을 붙여넣으세요:
+1. **터미널에서 서버 실행**:
+```bash
+python -m mnemo.mcp.cli serve-fastapi
+# 또는
+python -m mnemo.mcp.fastapi_server
+```
 
+서버가 실행되면 이런 메시지가 나타납니다:
+```
+🚀 Starting Mnemo FastAPI MCP Server
+URL: http://0.0.0.0:3333/mcp
+Health: http://0.0.0.0:3333/health
+```
+
+2. **`~/.cursor/mcp.json` 설정**:
 ```json
 {
   "mcpServers": {
     "mnemo": {
-      "command": "/Users/yourname/my-projects/mnemo/venv/bin/python",
-      "args": ["-m", "mnemo.mcp.stdio"],
-      "env": {
-        "MNEMO_DB_PATH": "./cursor_memories",
-        "MNEMO_COLLECTION": "my_ai_memories"
-      }
+      "url": "http://localhost:3333/mcp"
     }
   }
 }
 ```
 
-**⚠️ 중요! "command" 부분을 아까 복사한 Python 경로로 바꿔주세요!**
-
-#### Windows 예시:
-```json
-{
-  "mcpServers": {
-    "mnemo": {
-      "command": "C:\\Users\\yourname\\my-projects\\mnemo\\venv\\Scripts\\python.exe",
-      "args": ["-m", "mnemo.mcp.stdio"],
-      "env": {
-        "MNEMO_DB_PATH": "./cursor_memories",
-        "MNEMO_COLLECTION": "my_ai_memories"
-      }
-    }
-  }
-}
-```
+**장점**:
+- 한 번 실행하면 계속 동작
+- 브라우저에서 `http://localhost:3333/health` 접속해서 상태 확인 가능
+- 더 빠르고 안정적
 
 ### 4. Cursor 재시작
 설정을 적용하려면 Cursor를 완전히 종료했다가 다시 실행해야 합니다!
@@ -236,7 +231,7 @@ AI: 제가 저장된 기억을 확인해보니, 이 프로젝트는 FastAPI와 P
 ### 2. Cursor에서 @mnemo가 작동하지 않음
 - mcp.json의 Python 경로가 정확한지 확인
 - Cursor를 완전히 재시작했는지 확인
-- 터미널에서 `python -m mnemo.mcp.stdio` 직접 실행해보기
+- 터미널에서 `python -m mnemo.mcp.cli serve-fastapi` 직접 실행해보기
 
 ### 3. "No module named mnemo.mcp" 오류
 ```bash
@@ -282,7 +277,7 @@ rm -rf ./cursor_memories
   "mcpServers": {
     "mnemo": {
       "command": "/path/to/python",
-      "args": ["-m", "mnemo.mcp.stdio", "--debug"],
+      "url": "http://localhost:3333/mcp"
       "env": {
         "MNEMO_DB_PATH": "./cursor_memories",
         "MNEMO_COLLECTION": "my_ai_memories",

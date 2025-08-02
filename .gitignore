@@ -29,7 +29,11 @@ htmlcov/
 # ChromaDB
 *.db
 *.sqlite
+*.sqlite3
 mnemo_db/
+mnemo_mcp_db/
+cursor_memories/
+test_mcp_memories/
 example_db/
 chains_db/
 tools_db/

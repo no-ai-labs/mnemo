@@ -115,5 +115,32 @@ def test_connection(
         ))
 
 
+@app.command()
+def serve_fastapi(
+    host: str = typer.Option("0.0.0.0", help="Host to bind to"),
+    port: int = typer.Option(3333, help="Port to bind to"),
+    db_path: str = typer.Option("./mnemo_mcp_db", help="Database directory"),
+    collection: str = typer.Option("cursor_memories", help="ChromaDB collection name")
+):
+    """Start the FastAPI-based MCP server."""
+    
+    import os
+    os.environ["MNEMO_DB_PATH"] = db_path
+    os.environ["MNEMO_COLLECTION"] = collection
+    
+    console.print(Panel(
+        f"🚀 Starting Mnemo FastAPI MCP Server\n"
+        f"URL: http://{host}:{port}/mcp\n"
+        f"Health: http://{host}:{port}/health\n"
+        f"Collection: {collection}\n"
+        f"Database: {db_path}",
+        title="Mnemo FastAPI Server",
+        border_style="green"
+    ))
+    
+    from mnemo.mcp.fastapi_server import run_server
+    run_server(host=host, port=port)
+
+
 if __name__ == "__main__":
     app()

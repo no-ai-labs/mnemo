@@ -27,15 +27,31 @@ class MCPTool(BaseModel):
     name: str
     description: str
     input_schema: Dict[str, Any]
-    output_schema: Optional[Dict[str, Any]] = None
+    output_schema: Dict[str, Any] = Field(default_factory=dict)
+    
+    class Config:
+        # Convert to camelCase for JSON serialization
+        alias_generator = lambda field_name: ''.join(
+            word.capitalize() if i > 0 else word
+            for i, word in enumerate(field_name.split('_'))
+        )
+        populate_by_name = True
 
 
 class MCPPrompt(BaseModel):
     """Prompt template exposed via MCP."""
     name: str
     description: str
-    arguments: List[str]
+    arguments: List[Dict[str, Any]]
     template: str
+    
+    class Config:
+        # Convert to camelCase for JSON serialization
+        alias_generator = lambda field_name: ''.join(
+            word.capitalize() if i > 0 else word
+            for i, word in enumerate(field_name.split('_'))
+        )
+        populate_by_name = True
 
 
 class MCPRequest(BaseModel):

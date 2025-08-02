@@ -269,6 +269,13 @@ class MnemoVectorStore:
         # Extract memory metadata from document metadata
         metadata_dict = doc.metadata
         
+        # Handle tags - they may be stored as comma-separated string
+        tags_data = metadata_dict.get("tags", "")
+        if isinstance(tags_data, str):
+            tags = set(tag.strip() for tag in tags_data.split(",") if tag.strip())
+        else:
+            tags = set(tags_data) if tags_data else set()
+        
         # Reconstruct MemoryMetadata
         memory_metadata = MemoryMetadata(
             memory_id=metadata_dict.get("memory_id", ""),
@@ -277,15 +284,20 @@ class MnemoVectorStore:
             workspace_path=metadata_dict.get("workspace_path"),
             project_name=metadata_dict.get("project_name"),
             session_id=metadata_dict.get("session_id"),
-            tags=set(metadata_dict.get("tags", [])),
+            tags=tags,
             access_count=metadata_dict.get("access_count", 0),
             relevance_score=metadata_dict.get("relevance_score", 1.0)
         )
         
-        return MemoryDocument(
+        # Create the MemoryDocument with the proper metadata
+        memory_doc = MemoryDocument(
             page_content=doc.page_content,
-            memory_metadata=memory_metadata
+            metadata=doc.metadata
         )
+        # Set the _memory_metadata attribute directly
+        memory_doc._memory_metadata = memory_metadata
+        
+        return memory_doc
     
     def persist(self) -> None:
         """Persist the vector store to disk."""

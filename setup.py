@@ -46,7 +46,6 @@ setup(
         "console_scripts": [
             "mnemo=mnemo.cli:main",
             "mnemo-mcp=mnemo.mcp.cli:app",
-            "mnemo-mcp-stdio=mnemo.mcp.stdio:main",
         ],
     },
     classifiers=[

@@ -1,6 +1,6 @@
 """Entry point for MCP module."""
 
-from mnemo.mcp.stdio import main
+from mnemo.mcp.fastapi_server import run_server
 
 if __name__ == "__main__":
-    main()
+    run_server()

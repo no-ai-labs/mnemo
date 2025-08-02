@@ -1,4 +1,4 @@
-# 🚀 Complete Guide: Connecting Cursor with Mnemo (For Beginners)
+# 🚀 Complete Guide: Connecting Cursor with Mnemo
 
 This guide provides a detailed walkthrough for beginners on how to connect Mnemo MCP server with Cursor!
 
@@ -140,42 +140,37 @@ touch mcp.json  # macOS/Linux
 echo {} > mcp.json  # Windows
 ```
 
-### 3. Configure mcp.json
+### 3. Run MCP Server 🚀
 
-Open `~/.cursor/mcp.json` and paste the following:
+1. **Start the server in terminal**:
+```bash
+python -m mnemo.mcp.cli serve-fastapi
+# or
+python -m mnemo.mcp.fastapi_server
+```
 
+When the server starts, you'll see:
+```
+🚀 Starting Mnemo FastAPI MCP Server
+URL: http://0.0.0.0:3333/mcp
+Health: http://0.0.0.0:3333/health
+```
+
+2. **Configure `~/.cursor/mcp.json`**:
 ```json
 {
   "mcpServers": {
     "mnemo": {
-      "command": "/Users/yourname/my-projects/mnemo/venv/bin/python",
-      "args": ["-m", "mnemo.mcp.stdio"],
-      "env": {
-        "MNEMO_DB_PATH": "./cursor_memories",
-        "MNEMO_COLLECTION": "my_ai_memories"
-      }
+      "url": "http://localhost:3333/mcp"
     }
   }
 }
 ```
 
-**⚠️ Important! Replace "command" with your copied Python path!**
-
-#### Windows Example:
-```json
-{
-  "mcpServers": {
-    "mnemo": {
-      "command": "C:\\Users\\yourname\\my-projects\\mnemo\\venv\\Scripts\\python.exe",
-      "args": ["-m", "mnemo.mcp.stdio"],
-      "env": {
-        "MNEMO_DB_PATH": "./cursor_memories",
-        "MNEMO_COLLECTION": "my_ai_memories"
-      }
-    }
-  }
-}
-```
+**Advantages**:
+- Run once and it keeps running
+- Check status at `http://localhost:3333/health` in your browser
+- Faster and more stable
 
 ### 4. Restart Cursor
 You must fully restart Cursor to apply the settings!
@@ -236,7 +231,7 @@ AI: Checking stored memories, this project is a REST API using FastAPI and Postg
 ### 2. @mnemo Not Working in Cursor
 - Verify Python path in mcp.json is correct
 - Ensure Cursor was fully restarted
-- Try running `python -m mnemo.mcp.stdio` directly in terminal
+- Try running `python -m mnemo.mcp.cli serve-fastapi` directly in terminal
 
 ### 3. "No module named mnemo.mcp" Error
 ```bash
@@ -282,7 +277,7 @@ For detailed logs when troubleshooting:
   "mcpServers": {
     "mnemo": {
       "command": "/path/to/python",
-      "args": ["-m", "mnemo.mcp.stdio", "--debug"],
+      "url": "http://localhost:3333/mcp"
       "env": {
         "MNEMO_DB_PATH": "./cursor_memories",
         "MNEMO_COLLECTION": "my_ai_memories",

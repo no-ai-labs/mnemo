@@ -139,26 +139,27 @@ embeddings = MnemoEmbeddings(
 
 ## 🔌 MCP Integration (Cursor)
 
-### Quick Setup
-1. Add to `.cursor/mcp.json`:
+### Quick Setup 🚀
+1. Start the MCP server:
+```bash
+# Run in a terminal
+python -m mnemo.mcp.cli serve-fastapi
+# or
+python -m mnemo.mcp.fastapi_server
+```
+
+2. Add to `.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
     "mnemo": {
-      "command": "/path/to/python",
-      "args": ["-m", "mnemo.mcp.stdio"],
-      "env": {
-        "MNEMO_DB_PATH": "./cursor_memories",
-        "MNEMO_COLLECTION": "cursor_ai_memories"
-      }
+      "url": "http://localhost:3333/mcp"
     }
   }
 }
 ```
 
-2. Restart Cursor
-
-3. Use in Cursor:
+3. Restart Cursor and use:
 ```
 @mnemo remember "project_info" "This is a FastAPI project with PostgreSQL"
 @mnemo recall "project info"

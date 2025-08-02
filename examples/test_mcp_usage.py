@@ -16,9 +16,9 @@ def send_request(proc, request):
 def test_mnemo_mcp():
     """Test Mnemo MCP with actual operations."""
     
-    # Start the STDIO server
+    # Start the FastAPI server (for testing with subprocess)
     proc = subprocess.Popen(
-        [sys.executable, "-m", "mnemo.mcp.stdio"],
+        [sys.executable, "-m", "mnemo.mcp.fastapi_server"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
