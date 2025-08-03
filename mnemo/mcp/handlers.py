@@ -387,6 +387,119 @@ class ToolHandler:
                         "details": {"type": "object"}
                     }
                 }
+            ),
+            
+            # Neo4j Context Extraction Tools
+            MCPTool(
+                name="get_project_context",
+                title="Get Project Context from Neo4j",
+                description="Extract project overview and structure from Neo4j knowledge graph",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project": {"type": "string", "description": "Project name"},
+                        "include_packages": {"type": "boolean", "description": "Include top packages info", "default": True}
+                    },
+                    "required": ["project"]
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "project": {"type": "string"},
+                        "language": {"type": "string"},
+                        "stats": {"type": "object"},
+                        "top_packages": {"type": "array"}
+                    }
+                }
+            ),
+            
+            MCPTool(
+                name="get_function_context",
+                title="Get Function Context from Neo4j",
+                description="Extract detailed context about specific functions including callers and callees",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project": {"type": "string", "description": "Project name"},
+                        "function": {"type": "string", "description": "Function name to analyze"},
+                        "include_callers": {"type": "boolean", "description": "Include functions that call this", "default": True},
+                        "include_callees": {"type": "boolean", "description": "Include functions this calls", "default": True}
+                    },
+                    "required": ["project", "function"]
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "functions": {"type": "array", "description": "List of matching functions with context"}
+                    }
+                }
+            ),
+            
+            MCPTool(
+                name="get_class_hierarchy",
+                title="Get Class Hierarchy from Neo4j",
+                description="Extract class inheritance relationships from Neo4j",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project": {"type": "string", "description": "Project name"},
+                        "class": {"type": "string", "description": "Specific class name (optional)"}
+                    },
+                    "required": ["project"]
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "classes": {"type": "array"},
+                        "class_hierarchy": {"type": "array"}
+                    }
+                }
+            ),
+            
+            MCPTool(
+                name="get_call_graph",
+                title="Get Call Graph from Neo4j",
+                description="Extract function call relationships as a graph",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project": {"type": "string", "description": "Project name"},
+                        "function": {"type": "string", "description": "Start from specific function (optional)"},
+                        "depth": {"type": "integer", "description": "Max depth for traversal", "default": 2}
+                    },
+                    "required": ["project"]
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "nodes": {"type": "array"},
+                        "edges": {"type": "array"},
+                        "node_count": {"type": "integer"},
+                        "edge_count": {"type": "integer"}
+                    }
+                }
+            ),
+            
+            MCPTool(
+                name="get_dependencies",
+                title="Get Dependencies from Neo4j",
+                description="Extract package/module dependencies from Neo4j",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project": {"type": "string", "description": "Project name"},
+                        "package": {"type": "string", "description": "Specific package (optional)"}
+                    },
+                    "required": ["project"]
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "dependencies": {"type": "array"},
+                        "dependents": {"type": "array"},
+                        "package_dependencies": {"type": "array"}
+                    }
+                }
             )
         ]
     
@@ -881,6 +994,166 @@ class ToolHandler:
                         "recommendations": ["Error occurred"],
                         "details": {}
                     }
+                }
+        
+        # Neo4j Context Extraction Tools
+        elif tool_name == "get_project_context":
+            try:
+                from mnemo.graph.neo4j_context_extractor import Neo4jContextExtractor
+                extractor = Neo4jContextExtractor()
+                
+                result = extractor.get_project_overview(
+                    project_name=arguments["project"]
+                )
+                
+                if 'error' in result:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: {result['error']}"}],
+                        "structuredContent": result
+                    }
+                
+                summary = extractor.export_context(result, format='summary')
+                
+                return {
+                    "content": [{"type": "text", "text": summary}],
+                    "structuredContent": result
+                }
+                
+            except Exception as e:
+                return {
+                    "content": [{"type": "text", "text": f"Error: {str(e)}"}],
+                    "structuredContent": {"error": str(e)}
+                }
+        
+        elif tool_name == "get_function_context":
+            try:
+                from mnemo.graph.neo4j_context_extractor import Neo4jContextExtractor
+                extractor = Neo4jContextExtractor()
+                
+                result = extractor.get_function_context(
+                    project_name=arguments["project"],
+                    function_name=arguments["function"],
+                    include_callers=arguments.get("include_callers", True),
+                    include_callees=arguments.get("include_callees", True)
+                )
+                
+                if 'error' in result:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: {result['error']}"}],
+                        "structuredContent": result
+                    }
+                
+                markdown = extractor.export_context(result, format='markdown')
+                
+                return {
+                    "content": [{"type": "text", "text": markdown}],
+                    "structuredContent": result
+                }
+                
+            except Exception as e:
+                return {
+                    "content": [{"type": "text", "text": f"Error: {str(e)}"}],
+                    "structuredContent": {"error": str(e)}
+                }
+        
+        elif tool_name == "get_class_hierarchy":
+            try:
+                from mnemo.graph.neo4j_context_extractor import Neo4jContextExtractor
+                extractor = Neo4jContextExtractor()
+                
+                result = extractor.get_class_hierarchy(
+                    project_name=arguments["project"],
+                    class_name=arguments.get("class")
+                )
+                
+                if 'error' in result:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: {result['error']}"}],
+                        "structuredContent": result
+                    }
+                
+                summary = extractor.export_context(result, format='summary')
+                
+                return {
+                    "content": [{"type": "text", "text": summary}],
+                    "structuredContent": result
+                }
+                
+            except Exception as e:
+                return {
+                    "content": [{"type": "text", "text": f"Error: {str(e)}"}],
+                    "structuredContent": {"error": str(e)}
+                }
+        
+        elif tool_name == "get_call_graph":
+            try:
+                from mnemo.graph.neo4j_context_extractor import Neo4jContextExtractor
+                extractor = Neo4jContextExtractor()
+                
+                result = extractor.get_call_graph(
+                    project_name=arguments["project"],
+                    function_name=arguments.get("function"),
+                    depth=arguments.get("depth", 2)
+                )
+                
+                if 'error' in result:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: {result['error']}"}],
+                        "structuredContent": result
+                    }
+                
+                summary = extractor.export_context(result, format='summary')
+                
+                return {
+                    "content": [{"type": "text", "text": summary}],
+                    "structuredContent": result
+                }
+                
+            except Exception as e:
+                return {
+                    "content": [{"type": "text", "text": f"Error: {str(e)}"}],
+                    "structuredContent": {"error": str(e)}
+                }
+        
+        elif tool_name == "get_dependencies":
+            try:
+                from mnemo.graph.neo4j_context_extractor import Neo4jContextExtractor
+                extractor = Neo4jContextExtractor()
+                
+                result = extractor.get_package_dependencies(
+                    project_name=arguments["project"],
+                    package_name=arguments.get("package")
+                )
+                
+                if 'error' in result:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: {result['error']}"}],
+                        "structuredContent": result
+                    }
+                
+                # Format dependencies nicely
+                if 'package' in result:
+                    text = f"Package: {result['package']}\n"
+                    text += f"Dependencies ({len(result['dependencies'])}):\n"
+                    for dep in result['dependencies'][:10]:
+                        text += f"  - {dep['dep_package']} ({dep['call_count']} calls)\n"
+                    text += f"\nDependents ({len(result['dependents'])}):\n"
+                    for dep in result['dependents'][:10]:
+                        text += f"  - {dep['dependent_package']} ({dep['call_count']} calls)\n"
+                else:
+                    text = f"Package dependencies for {arguments['project']}:\n"
+                    for dep in result['package_dependencies'][:20]:
+                        text += f"  {dep['from_package']} -> {dep['to_package']} ({dep['calls']} calls)\n"
+                
+                return {
+                    "content": [{"type": "text", "text": text}],
+                    "structuredContent": result
+                }
+                
+            except Exception as e:
+                return {
+                    "content": [{"type": "text", "text": f"Error: {str(e)}"}],
+                    "structuredContent": {"error": str(e)}
                 }
         
         elif tool_name == "visualize_graph":
