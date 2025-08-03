@@ -29,6 +29,8 @@ class MCPRequestModel(BaseModel):
 
 # Global memory client
 memory_client: Optional[MnemoMemoryClient] = None
+auto_tracking_client: Optional[MnemoMemoryClient] = None
+auto_tracking_store: Optional[MnemoVectorStore] = None
 resource_handler: Optional[ResourceHandler] = None
 tool_handler: Optional[ToolHandler] = None
 prompt_handler: Optional[PromptHandler] = None
@@ -39,7 +41,8 @@ session_tracker: Optional[SessionMemoryTracker] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize memory system on startup."""
-    global memory_client, resource_handler, tool_handler, prompt_handler, auto_tracker, session_tracker
+    global memory_client, resource_handler, tool_handler, prompt_handler, auto_tracker, session_tracker, auto_tracking_client
+    global auto_tracking_store
     
     # Get configuration from environment
     db_path = os.getenv("MNEMO_DB_PATH", "./mnemo_mcp_db")
@@ -48,28 +51,54 @@ async def lifespan(app: FastAPI):
     tracking_interval = int(os.getenv("MNEMO_TRACKING_INTERVAL", "300"))  # 5 minutes default
     session_tracking = os.getenv("MNEMO_SESSION_TRACKING", "true").lower() == "true"
     
+    # Get embedding model from environment
+    embedding_model = os.getenv("MNEMO_EMBEDDING_MODEL", "Qwen/Qwen3-Embedding-0.6B")
+    
+    # Initialize embeddings
+    from mnemo.core.embeddings import MnemoEmbeddings
+    embeddings = MnemoEmbeddings(
+        sentence_transformer_model=embedding_model,
+        use_mock=False
+    )
+    
     # Initialize memory system
     vector_store = MnemoVectorStore(
         collection_name=collection,
-        persist_directory=db_path
+        persist_directory=db_path,
+        embedding_function=embeddings
     )
     memory_client = MnemoMemoryClient(vector_store)
+    
+    # Initialize separate vector store for auto-tracking
+    auto_tracking_store = None
+    auto_tracking_client = None
+    if auto_tracking:
+        auto_tracking_store = MnemoVectorStore(
+            collection_name=f"{collection}_autotrack",
+            persist_directory=db_path,
+            embedding_function=embeddings
+        )
+        auto_tracking_client = MnemoMemoryClient(auto_tracking_store)
     
     # Initialize handlers
     resource_handler = ResourceHandler(memory_client)
     tool_handler = ToolHandler(memory_client)
     prompt_handler = PromptHandler(memory_client)
     
-    # Initialize auto tracker
-    auto_tracker = AutoProjectTracker(memory_client)
+    # Initialize auto tracker with separate client
+    auto_tracker = AutoProjectTracker(auto_tracking_client if auto_tracking_client else memory_client)
     
-    # Initialize session tracker
+    # Initialize session tracker with separate client
     if session_tracking:
-        session_tracker = SessionMemoryTracker(memory_client)
+        session_tracker = SessionMemoryTracker(auto_tracking_client if auto_tracking_client else memory_client)
     
     print(f"[MCP Server] Mnemo MCP Server initialized")
+    print(f"[MCP Server] Using embedding model: {embedding_model}")
+    print(f"[MCP Server] Embedding type: {embeddings.embedding_type}")
     print(f"   Database: {db_path}")
-    print(f"   Collection: {collection}")
+    print(f"   Main collection: {collection}")
+    if auto_tracking:
+        print(f"   Auto-tracking collection: {collection}_autotrack")
     print(f"   Auto-tracking: {'Enabled' if auto_tracking else 'Disabled'}")
     print(f"   Session tracking: {'Enabled' if session_tracking else 'Disabled'}")
     

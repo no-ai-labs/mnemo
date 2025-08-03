@@ -138,9 +138,10 @@ class ProjectContextManager:
         # For now, simple name matching
         
         result = self.graph.run("""
-            MATCH (f:Function {project: $project})
-            WHERE toLower(f.name) CONTAINS toLower($query)
-               OR toLower(f.class_name) CONTAINS toLower($query)
+            MATCH (f {project: $project})
+            WHERE (f:Function OR f:KotlinFunction OR f:KotlinClass)
+              AND (toLower(f.name) CONTAINS toLower($query)
+               OR toLower(f.class_name) CONTAINS toLower($query))
             OPTIONAL MATCH (f)-[:CALLS]->(callee)
             RETURN f, collect(callee) as calls
             LIMIT 5

@@ -59,29 +59,40 @@ class KotlinAnalyzer:
         return stats
         
     def _analyze_kotlin_files(self, project_path: Path, project_name: str) -> int:
-        """Analyze Kotlin source files."""
+        """Analyze Kotlin source files with enhanced patterns."""
         kotlin_files = list(project_path.rglob("*.kt"))
+        total_functions = 0
+        total_calls = 0
         
         for kt_file in kotlin_files:
             # Skip build and gradle files
-            if any(skip in str(kt_file) for skip in ['/build/', '/.gradle/', '/gradlew']):
+            if any(skip in str(kt_file) for skip in ['/build/', '/.gradle/', '/gradlew', '/test/', '/generated/']):
                 continue
                 
             relative_path = kt_file.relative_to(project_path)
             content = kt_file.read_text(encoding='utf-8', errors='ignore')
+            
+            # Remove comments to avoid false positives
+            content = self._remove_comments(content)
             
             # Extract package
             package_match = re.search(r'package\s+([\w.]+)', content)
             package_name = package_match.group(1) if package_match else "default"
             
             # Extract imports
-            imports = re.findall(r'import\s+([\w.]+)', content)
+            imports = re.findall(r'import\s+([\w.*]+)', content)
             
-            # Extract classes/interfaces/objects
-            classes = re.findall(r'(?:class|interface|object)\s+(\w+)', content)
+            # Enhanced class/interface/object extraction
+            class_info = self._extract_classes(content)
             
-            # Extract functions
-            functions = re.findall(r'fun\s+(\w+)', content)
+            # Enhanced function extraction
+            function_info = self._extract_functions(content, package_name, relative_path)
+            
+            # Extract function calls
+            call_info = self._extract_function_calls(content, package_name, relative_path)
+            
+            total_functions += len(function_info)
+            total_calls += len(call_info)
             
             # Create file node
             file_node = Node(
@@ -90,8 +101,8 @@ class KotlinAnalyzer:
                 path=str(relative_path),
                 package=package_name,
                 project=project_name,
-                classes=len(classes),
-                functions=len(functions)
+                classes=len(class_info),
+                functions=len(function_info)
             )
             self.graph.create(file_node)
             
@@ -104,17 +115,57 @@ class KotlinAnalyzer:
             self.graph.merge(package_node, "Package", "name")
             self.graph.create(Relationship(file_node, "IN_PACKAGE", package_node))
             
-            # Create class nodes
-            for class_name in classes:
+            # Create class nodes with enhanced info
+            for cls in class_info:
                 class_node = Node(
                     "KotlinClass",
-                    name=class_name,
+                    name=cls['name'],
+                    full_name=f"{package_name}.{cls['name']}",
                     file=str(relative_path),
                     package=package_name,
+                    type=cls['type'],
+                    inheritance=cls.get('inheritance', ''),
                     project=project_name
                 )
                 self.graph.create(class_node)
                 self.graph.create(Relationship(class_node, "DEFINED_IN", file_node))
+            
+            # Create function nodes
+            for func in function_info:
+                func_node = Node(
+                    "KotlinFunction",
+                    name=func['name'],
+                    full_name=func['full_name'],
+                    file=str(relative_path),
+                    package=package_name,
+                    return_type=func.get('return_type', 'Unit'),
+                    type=func.get('type', 'function'),
+                    class_name=func.get('class_name'),
+                    project=project_name
+                )
+                self.graph.create(func_node)
+                self.graph.create(Relationship(func_node, "DEFINED_IN", file_node))
+            
+            # Create call relationships
+            for call in call_info:
+                # Try to find the target function
+                target_func = self._resolve_function_call(call, package_name, imports, project_name)
+                if target_func:
+                    caller_func = self._find_containing_function(call['line'], function_info)
+                    if caller_func:
+                        caller_node = self.graph.nodes.match(
+                            "KotlinFunction",
+                            full_name=caller_func['full_name'],
+                            project=project_name
+                        ).first()
+                        
+                        if caller_node:
+                            self.graph.create(Relationship(
+                                caller_node,
+                                "CALLS",
+                                target_func,
+                                call_type=call['type']
+                            ))
                 
             # Track imports
             for imp in imports:
@@ -127,7 +178,206 @@ class KotlinAnalyzer:
                     self.graph.merge(import_node, "Import", "name")
                     self.graph.create(Relationship(file_node, "IMPORTS", import_node))
                     
+        print(f"[KOTLIN] Analyzed {len(kotlin_files)} files, found {total_functions} functions and {total_calls} calls")
         return len(kotlin_files)
+    
+    def _remove_comments(self, content: str) -> str:
+        """Remove single-line and multi-line comments."""
+        # Remove single-line comments
+        content = re.sub(r'//.*$', '', content, flags=re.MULTILINE)
+        # Remove multi-line comments
+        content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
+        return content
+    
+    def _extract_classes(self, content: str) -> List[Dict]:
+        """Extract classes with enhanced patterns."""
+        class_pattern = r'(?:(?:public|private|internal|protected|open|sealed|data|abstract|inner)?\s+)*(?:class|interface|object|enum\s+class)\s+(\w+)(?:<[^>]+>)?(?:\s*:\s*([^{]+))?'
+        classes = []
+        
+        for match in re.finditer(class_pattern, content):
+            class_name = match.group(1)
+            inheritance = match.group(2).strip() if match.group(2) else ""
+            class_type = 'class'
+            if 'interface' in match.group(0):
+                class_type = 'interface'
+            elif 'object' in match.group(0):
+                class_type = 'object'
+            elif 'enum' in match.group(0):
+                class_type = 'enum'
+                
+            classes.append({
+                'name': class_name,
+                'inheritance': inheritance,
+                'type': class_type
+            })
+        
+        return classes
+    
+    def _extract_functions(self, content: str, package: str, file_path) -> List[Dict]:
+        """Extract functions with enhanced patterns."""
+        functions = []
+        lines = content.split('\n')
+        
+        # Pattern for regular and extension functions
+        func_pattern = r'(?:(?:public|private|internal|protected|open|override|suspend|inline|tailrec)?\s+)*fun\s+(?:<[^>]+>\s+)?(?:([^\s.]+)\.)?([\w]+)\s*\([^)]*\)(?:\s*:\s*([^\s{]+))?'
+        
+        # Find the class context for each function
+        class_context = self._build_class_context(content)
+        
+        for i, line in enumerate(lines):
+            match = re.search(func_pattern, line)
+            if match:
+                receiver = match.group(1)
+                func_name = match.group(2)
+                return_type = match.group(3) or 'Unit'
+                
+                # Determine if this function is inside a class
+                containing_class = self._find_containing_class(i, class_context)
+                
+                if receiver:  # Extension function
+                    full_name = f"{package}.{receiver}.{func_name}"
+                    func_type = 'extension'
+                elif containing_class:
+                    full_name = f"{package}.{containing_class}.{func_name}"
+                    func_type = 'method'
+                else:
+                    full_name = f"{package}.{func_name}"
+                    func_type = 'function'
+                
+                functions.append({
+                    'name': func_name,
+                    'full_name': full_name,
+                    'return_type': return_type,
+                    'type': func_type,
+                    'class_name': containing_class,
+                    'receiver': receiver,
+                    'line': i + 1
+                })
+        
+        return functions
+    
+    def _extract_function_calls(self, content: str, package: str, file_path) -> List[Dict]:
+        """Extract function calls with context."""
+        calls = []
+        lines = content.split('\n')
+        
+        # Various call patterns
+        patterns = [
+            # Regular function calls: functionName(...)
+            (r'(?<!fun\s)(?<!override\s)(?<!\.)(\w+)\s*\(', 'function_call'),
+            # Method calls: object.method(...)
+            (r'(\w+)\.(\w+)\s*\(', 'method_call'),
+            # Constructor calls: ClassName(...)
+            (r'\b([A-Z]\w*)\s*\(', 'constructor_call'),
+            # Safe calls: object?.method(...)
+            (r'(\w+)\?\.(\w+)\s*\(', 'safe_call'),
+            # Scope functions: let, run, apply, also, with
+            (r'\.(let|run|apply|also|with)\s*\{', 'scope_function'),
+        ]
+        
+        for i, line in enumerate(lines):
+            for pattern, call_type in patterns:
+                for match in re.finditer(pattern, line):
+                    if call_type in ['method_call', 'safe_call']:
+                        calls.append({
+                            'caller': match.group(1),
+                            'callee': match.group(2),
+                            'type': call_type,
+                            'line': i + 1
+                        })
+                    else:
+                        calls.append({
+                            'callee': match.group(1),
+                            'type': call_type,
+                            'line': i + 1
+                        })
+        
+        return calls
+    
+    def _build_class_context(self, content: str) -> List[Tuple[int, int, str]]:
+        """Build a map of class boundaries in the file."""
+        lines = content.split('\n')
+        class_stack = []
+        class_boundaries = []
+        
+        class_start_pattern = r'(?:class|interface|object)\s+(\w+)'
+        
+        brace_count = 0
+        current_class = None
+        class_start_line = 0
+        
+        for i, line in enumerate(lines):
+            # Check for class start
+            match = re.search(class_start_pattern, line)
+            if match and '{' in line:
+                current_class = match.group(1)
+                class_start_line = i
+                brace_count = 1
+                continue
+            
+            if current_class:
+                brace_count += line.count('{') - line.count('}')
+                if brace_count == 0:
+                    class_boundaries.append((class_start_line, i, current_class))
+                    current_class = None
+        
+        return class_boundaries
+    
+    def _find_containing_class(self, line_num: int, class_boundaries: List[Tuple[int, int, str]]) -> Optional[str]:
+        """Find which class contains a given line number."""
+        for start, end, class_name in class_boundaries:
+            if start <= line_num <= end:
+                return class_name
+        return None
+    
+    def _find_containing_function(self, line_num: int, functions: List[Dict]) -> Optional[Dict]:
+        """Find which function contains a given line number."""
+        # Simple heuristic: find the closest function above the line
+        closest_func = None
+        closest_distance = float('inf')
+        
+        for func in functions:
+            func_line = func.get('line', 0)
+            if func_line < line_num:
+                distance = line_num - func_line
+                if distance < closest_distance:
+                    closest_distance = distance
+                    closest_func = func
+        
+        # Only return if reasonably close (within 50 lines)
+        if closest_func and closest_distance < 50:
+            return closest_func
+        return None
+    
+    def _resolve_function_call(self, call: Dict, current_package: str, imports: List[str], project_name: str) -> Optional:
+        """Try to resolve a function call to its definition."""
+        callee = call['callee']
+        
+        # Try to find in current package
+        possible_targets = [
+            f"{current_package}.{callee}",
+            callee
+        ]
+        
+        # Check imports
+        for imp in imports:
+            if imp.endswith(f'.{callee}'):
+                possible_targets.insert(0, imp)
+            elif imp.endswith('*'):
+                base = imp[:-1]  # Remove the *
+                possible_targets.append(f"{base}{callee}")
+        
+        # Try to find the function node
+        for target in possible_targets:
+            func_node = self.graph.nodes.match(
+                "KotlinFunction",
+                project=project_name
+            ).where(f"_.full_name = '{target}' OR _.name = '{callee}'").first()
+            
+            if func_node:
+                return func_node
+        
+        return None
         
     def _analyze_gradle_structure(self, project_path: Path, project_name: str) -> int:
         """Analyze Gradle module structure."""

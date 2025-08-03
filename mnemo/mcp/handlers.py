@@ -584,9 +584,10 @@ class ToolHandler:
                     from py2neo import Graph
                     graph = Graph("bolt://localhost:7687", auth=("neo4j", "password123"))
                     results = graph.run("""
-                        MATCH (f:Function)
-                        WHERE toLower(f.name) CONTAINS toLower($pattern)
-                           OR toLower(f.full_name) CONTAINS toLower($pattern)
+                        MATCH (f)
+                        WHERE (f:Function OR f:KotlinFunction OR f:KotlinClass)
+                          AND (toLower(f.name) CONTAINS toLower($pattern)
+                           OR toLower(f.full_name) CONTAINS toLower($pattern))
                         RETURN f.full_name as function, f.file_path as file, f.project as project
                         LIMIT 20
                     """, pattern=pattern).data()
