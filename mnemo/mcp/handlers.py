@@ -520,12 +520,12 @@ class ToolHandler:
                     """, project=project_name).data()[0]
                     
                 elif language == "kotlin":
-                    from mnemo.graph.kotlin_analyzer import KotlinAnalyzer
-                    analyzer = KotlinAnalyzer()
+                    from mnemo.graph.kotlin_analyzer_simple import SimpleKotlinAnalyzer
+                    analyzer = SimpleKotlinAnalyzer()
                     result = analyzer.analyze_kotlin_project(project_path, project_name)
                     stats = {
-                        'functions': result.get('files', 0),
-                        'calls': result.get('modules', 0),
+                        'functions': result.get('functions', 0),
+                        'calls': result.get('calls', 0),
                         'files': result.get('files', 0)
                     }
                     

@@ -8,6 +8,7 @@ from py2neo import Graph, Node, Relationship
 
 from mnemo.graph.call_graph_builder import CallGraphBuilder
 from mnemo.graph.enhanced_analyzer import EnhancedCodeAnalyzer
+from mnemo.graph.kotlin_analyzer_simple import SimpleKotlinAnalyzer
 from mnemo.memory.client import MnemoMemoryClient
 
 
@@ -49,6 +50,8 @@ class ProjectContextManager:
             self._analyze_js_project(project_path, project_name)
         elif project_type == "java":
             self._analyze_java_project(project_path, project_name)
+        elif project_type == "kotlin":
+            self._analyze_kotlin_project(project_path, project_name)
         
         # Store analysis metadata
         analysis_end = datetime.now()
@@ -89,6 +92,14 @@ class ProjectContextManager:
         # - Find Spring annotations
         # - Track dependency injection
         print(f"[CONTEXT] Java analysis not yet implemented")
+        
+    def _analyze_kotlin_project(self, project_path: str, project_name: str):
+        """Analyze Kotlin project."""
+        try:
+            analyzer = SimpleKotlinAnalyzer()
+            analyzer.analyze_kotlin_project(project_path, project_name)
+        except Exception as e:
+            print(f"[CONTEXT] Error analyzing Kotlin project: {e}")
         
     def _get_project_stats(self, project_name: str) -> Dict:
         """Get statistics for a project."""
