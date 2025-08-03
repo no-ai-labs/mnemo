@@ -176,13 +176,19 @@ async def handle_mcp_request(request: MCPRequestModel):
             tool_name = request.params.get("name")
             arguments = request.params.get("arguments", {})
             
+            print(f"[MCP DEBUG] Tool call: {tool_name}")
+            print(f"[MCP DEBUG] Arguments: {arguments}")
+            
             # Track session if enabled
             if session_tracker and tool_name in ["remember", "recall", "search"]:
                 # Extract meaningful content from arguments
                 content = arguments.get("content") or arguments.get("query") or str(arguments)
                 session_tracker.add_message("user", f"Tool: {tool_name} - {content}", "tool_call")
             
+            print(f"[MCP DEBUG] Calling tool handler...")
             result = await tool_handler.call_tool(tool_name, arguments)
+            print(f"[MCP DEBUG] Tool handler returned: {type(result)}")
+            print(f"[MCP DEBUG] Result content: {result}")
             
             # Track result if session tracking enabled
             if session_tracker and tool_name in ["remember", "recall", "search"]:
@@ -246,6 +252,10 @@ async def handle_mcp_request(request: MCPRequestModel):
         }
     
     except Exception as e:
+        print(f"[MCP ERROR] Exception in handle_mcp_request: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
         return {
             "jsonrpc": "2.0",
             "error": {

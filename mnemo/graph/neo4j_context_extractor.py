@@ -16,22 +16,46 @@ class Neo4jContextExtractor:
     def get_project_overview(self, project_name: str) -> Dict:
         """Get high-level overview of a project."""
         try:
-            # Basic stats
-            stats = self.graph.run("""
-                MATCH (p:Project {name: $project})
-                OPTIONAL MATCH (f:Function {project: $project})
-                OPTIONAL MATCH (c:Class {project: $project})
-                OPTIONAL MATCH (file:File {project: $project})
-                OPTIONAL MATCH (pkg:Package {project: $project})
-                OPTIONAL MATCH (dsl:DSLBlock {project: $project})
-                RETURN p.language as language,
-                       p.absolute_path as path,
-                       count(DISTINCT f) as functions,
-                       count(DISTINCT c) as classes,
-                       count(DISTINCT file) as files,
-                       count(DISTINCT pkg) as packages,
-                       count(DISTINCT dsl) as dsl_blocks
-            """, project=project_name).data()[0]
+            # Get project info first
+            project = self.graph.nodes.match("Project", name=project_name).first()
+            if not project:
+                return {'error': f'Project {project_name} not found'}
+            
+            # Count each type separately to avoid cartesian product
+            func_count = self.graph.run("""
+                MATCH (f:Function {project: $project})
+                RETURN count(f) as count
+            """, project=project_name).evaluate() or 0
+            
+            class_count = self.graph.run("""
+                MATCH (c:Class {project: $project})
+                RETURN count(c) as count
+            """, project=project_name).evaluate() or 0
+            
+            file_count = self.graph.run("""
+                MATCH (f:File {project: $project})
+                RETURN count(f) as count
+            """, project=project_name).evaluate() or 0
+            
+            pkg_count = self.graph.run("""
+                MATCH (p:Package {project: $project})
+                RETURN count(p) as count
+            """, project=project_name).evaluate() or 0
+            
+            dsl_count = self.graph.run("""
+                MATCH (d:DSLBlock {project: $project})
+                RETURN count(d) as count
+            """, project=project_name).evaluate() or 0
+            
+            stats = {
+                'language': project.get('language'),
+                'path': project.get('absolute_path'),
+                'functions': func_count,
+                'classes': class_count,
+                'files': file_count,
+                'packages': pkg_count,
+                'dsl_blocks': dsl_count
+            }
             
             # Top-level structure
             packages = self.graph.run("""
@@ -130,7 +154,7 @@ class Neo4jContextExtractor:
                            collect(DISTINCT parent.name) as parents,
                            collect(DISTINCT child.name) as children,
                            file.relative_path as file_path
-                """, project=project_name, class=class_name).data()
+                """, project=project_name, **{"class": class_name}).data()
                 
                 if not classes:
                     return {'error': f'Class {class_name} not found'}
