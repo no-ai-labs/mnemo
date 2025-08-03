@@ -146,10 +146,11 @@ embeddings = MnemoEmbeddings(
 ### Quick Setup 🚀
 1. Start the MCP server:
 ```bash
-# Run in a terminal
+# Run in a terminal (FastAPI mode - recommended)
 python -m mnemo.mcp.cli serve-fastapi
-# or
-python -m mnemo.mcp.fastapi_server
+
+# Alternative: stdio mode for direct MCP protocol
+python -m mnemo.mcp.cli serve-stdio
 ```
 
 2. Add to `.cursor/mcp.json`:
@@ -184,9 +185,19 @@ After installation, these tools are available in Cursor:
 
 #### Code Intelligence Tools (NEW!)
 - **analyze_project**: Build knowledge graph of any project
+  - Supports Python, Kotlin, JavaScript, TypeScript
+  - Depth levels: `basic`, `deep`, `complete` (default: complete)
+  - Example: `analyze_project("/path/to/project", "project-name", "python")`
 - **find_pattern**: Find similar code patterns across projects
+  - Uses semantic search to find related patterns
+  - Example: `find_pattern("authentication", "project-name")`
 - **compare_projects**: Compare coding patterns between projects
+  - Finds common patterns and differences
+  - Example: `compare_projects("project1", "project2")`
 - **check_guardrails**: Analyze code quality and detect issues
+  - Returns health score (0-100) with percentage-based metrics
+  - Checks: duplicates, unused code, complexity, consistency
+  - Example: `check_guardrails("project-name")`
 
 ### 🔍 Auto-Tracking Features (NEW!)
 
@@ -218,12 +229,63 @@ Configuration:
 
 When AI assistants like Cursor work on multiple projects, they often "vibe code" - creating duplicate implementations, using different libraries for the same features, or ignoring existing patterns. Mnemo solves this with **knowledge graphs** that capture and reuse patterns across all your projects.
 
-### 🛡️ Minimal Guardrails for Vibe Coding
+### 🛡️ Code Guardrails - Health Check for Your Codebase
 
-Stop AI from:
-- **Reinventing the wheel**: "You already have CustomError in errors.py!"
-- **Library chaos**: "This project uses requests, not urllib"
-- **Style drift**: "Keep using snake_case like the rest of the codebase"
+Mnemo's Code Guardrails analyze your project and provide a health score based on percentage metrics:
+
+#### Health Score System (0-100)
+- **🌟 85-100**: Excellent code quality
+- **👍 70-84**: Good, minor improvements needed  
+- **🤔 50-69**: Fair, room for improvement
+- **⚠️ 30-49**: Warning, several issues need attention
+- **😱 0-29**: Critical, major refactoring needed
+
+#### What We Check
+
+**1. Duplicate Implementations** (중복 구현)
+- Finds functions with same names in different modules
+- Example: `"You already have CustomError in errors.py!"`
+- Penalty based on duplicate rate (% of total functions)
+
+**2. Unused Functions** (미사용 함수)
+- Detects dead code that's never called
+- Helps maintain a clean, efficient codebase
+- Penalty based on unused rate (% of total functions)
+
+**3. Complexity Hotspots** (복잡도 핫스팟)
+- Identifies overly complex files and functions
+- Highlights areas that need refactoring
+- Progressive penalty for high complexity
+
+**4. Consistency Issues** (일관성 문제)
+- Detects style drift and pattern violations
+- Example: `"Keep using snake_case like the rest of the codebase"`
+- Checks module size consistency
+
+**5. Potential Risks** (잠재적 위험)
+- Security issues and dangerous patterns
+- High penalty (10 points each) for critical risks
+
+**6. DSL Pattern Analysis** (Kotlin)
+- Tracks underused DSL patterns
+- Helps identify experimental or abandoned features
+
+#### Usage
+
+```bash
+# Check project health
+mcp check-guardrails <project-name>
+
+# Example output:
+# Health Score: 97/100 🌟 Excellent!
+# - Duplicate rate: 2.1%
+# - Unused rate: 5.2%
+# - Issue density: 0.9
+```
+
+Real-world Results:
+- **Spice Framework (Kotlin)**: 97/100 🌟 (2.1% duplicates, 5.2% unused)
+- **Mnemo (Python)**: 75/100 👍 (37.7% duplicates, 47.2% unused)
 
 ### 📊 Code Knowledge Graph with Neo4j
 
@@ -233,11 +295,24 @@ Build a searchable graph of your codebase:
 # Start Neo4j
 docker-compose -f docker-compose/docker-compose.yml up -d
 
-# Analyze a Python project
-from mnemo.graph.call_graph_builder import CallGraphBuilder
+# Analyze a Python project (Complete Analysis)
+from mnemo.graph.complete_python_analyzer import CompletePythonAnalyzer
 
-builder = CallGraphBuilder()
-builder.build_from_directory("./my-project", "my-project-name")
+analyzer = CompletePythonAnalyzer()
+results = analyzer.analyze_complete("./my-project", "my-project-name", ["all"])
+
+# Analyze a Kotlin project  
+from mnemo.graph.complete_kotlin_analyzer import CompleteKotlinAnalyzer
+
+analyzer = CompleteKotlinAnalyzer()
+results = analyzer.analyze_complete("./kotlin-project", "project-name", ["all"])
+
+# Check code health
+from mnemo.graph.code_guardrails import CodeGuardrails
+
+guardrails = CodeGuardrails()
+health = guardrails.analyze_project_health("my-project-name")
+print(f"Health Score: {health['health_score']}/100")
 ```
 
 ### 🌍 Multi-Language Support
