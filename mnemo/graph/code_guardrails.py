@@ -17,23 +17,127 @@ class CodeGuardrails:
                  username: str = "neo4j", 
                  password: str = "password123"):
         self.graph = Graph(neo4j_uri, auth=(username, password))
+    
+    def _get_codebase_metrics(self, project_name: str) -> Dict:
+        """Get codebase size metrics for percentage calculations."""
+        total_functions = self.graph.run("""
+            MATCH (f:Function {project: $project})
+            RETURN count(f) as count
+        """, project=project_name).evaluate() or 1
+        
+        total_classes = self.graph.run("""
+            MATCH (c:Class {project: $project})
+            RETURN count(c) as count
+        """, project=project_name).evaluate() or 1
+        
+        total_files = self.graph.run("""
+            MATCH (f:File {project: $project})
+            RETURN count(f) as count
+        """, project=project_name).evaluate() or 1
+        
+        # Calculate codebase size score (functions + classes * 2 + files)
+        codebase_size = total_functions + (total_classes * 2) + total_files
+        
+        return {
+            'total_functions': total_functions,
+            'total_classes': total_classes,
+            'total_files': total_files,
+            'codebase_size': codebase_size
+        }
         
     def analyze_project_health(self, project_name: str) -> Dict:
         """Comprehensive health check for a project."""
         print(f"[GUARDRAILS] Analyzing project health: {project_name}")
         
-        results = {
-            'duplicates': self.find_duplicate_implementations(project_name),
-            'unused_functions': self.find_unused_functions(project_name),
-            'strange_patterns': self.detect_strange_patterns(project_name),
-            'potential_risks': self.detect_potential_risks(project_name),
-            'consistency_issues': self.check_consistency(project_name),
-            'complexity_hotspots': self.find_complexity_hotspots(project_name)
-        }
-        
-        # Calculate health score
-        total_issues = sum(len(v) for v in results.values() if isinstance(v, list))
-        results['health_score'] = max(0, 100 - (total_issues * 5))  # -5 points per issue
+        try:
+            # Check if this is a Kotlin project by looking for package attributes
+            is_kotlin = self.graph.run("""
+                MATCH (f:Function {project: $project})
+                WHERE f.package IS NOT NULL AND f.module IS NULL
+                RETURN count(f) > 0 as is_kotlin
+            """, project=project_name).evaluate()
+            
+            if is_kotlin:
+                print(f"[GUARDRAILS] Detected Kotlin project, using adapted queries")
+                return self._analyze_kotlin_project_health(project_name)
+            
+            results = {
+                'duplicates': self.find_duplicate_implementations(project_name),
+                'unused_functions': self.find_unused_functions(project_name),
+                'strange_patterns': self.detect_strange_patterns(project_name),
+                'potential_risks': self.detect_potential_risks(project_name),
+                'consistency_issues': self.check_consistency(project_name),
+                'complexity_hotspots': self.find_complexity_hotspots(project_name)
+            }
+            
+            # Get codebase metrics for percentage calculations
+            metrics = self._get_codebase_metrics(project_name)
+            
+            # Calculate issue rates (percentages)
+            duplicate_rate = (len(results.get('duplicates', [])) / max(metrics['total_functions'], 1)) * 100
+            unused_rate = (len(results.get('unused_functions', [])) / max(metrics['total_functions'], 1)) * 100
+            
+            # Calculate penalty based on rates
+            penalty = 0
+            
+            # Duplicate rate penalty (max 20 points)
+            if duplicate_rate > 50:
+                penalty += 20
+            elif duplicate_rate > 30:
+                penalty += 15
+            elif duplicate_rate > 15:
+                penalty += 10
+            elif duplicate_rate > 5:
+                penalty += 5
+            
+            # Unused code rate penalty (max 15 points)
+            if unused_rate > 50:
+                penalty += 15
+            elif unused_rate > 30:
+                penalty += 10
+            elif unused_rate > 15:
+                penalty += 7
+            elif unused_rate > 5:
+                penalty += 3
+            
+            # Other issues (scaled by codebase size)
+            issue_density = (len(results.get('strange_patterns', [])) + 
+                            len(results.get('consistency_issues', [])) + 
+                            len(results.get('complexity_hotspots', []))) / max(metrics['codebase_size'] / 100, 1)
+            
+            if issue_density > 10:
+                penalty += 15
+            elif issue_density > 5:
+                penalty += 10
+            elif issue_density > 2:
+                penalty += 5
+            
+            # Critical risks (always high penalty)
+            penalty += len(results.get('potential_risks', [])) * 10
+            
+            # Calculate final score (no negative scores)
+            results['health_score'] = max(0, 100 - penalty)
+            
+            # Add metrics to results
+            results['metrics'] = {
+                **metrics,
+                'duplicate_rate': round(duplicate_rate, 1),
+                'unused_rate': round(unused_rate, 1),
+                'issue_density': round(issue_density, 1)
+            }
+            
+        except Exception as e:
+            print(f"[GUARDRAILS] Error during analysis: {e}")
+            results = {
+                'health_score': 0,
+                'duplicates': [],
+                'unused_functions': [],
+                'strange_patterns': [],
+                'potential_risks': [],
+                'consistency_issues': [],
+                'complexity_hotspots': [],
+                'error': str(e)
+            }
         
         return results
         
@@ -46,9 +150,12 @@ class CodeGuardrails:
             MATCH (f1:Function {project: $project})
             MATCH (f2:Function {project: $project})
             WHERE f1.name = f2.name 
-                  AND f1.module <> f2.module
+                  AND ((f1.module IS NOT NULL AND f2.module IS NOT NULL AND f1.module <> f2.module)
+                       OR (f1.package IS NOT NULL AND f2.package IS NOT NULL AND f1.package <> f2.package)
+                       OR (f1.file_path IS NOT NULL AND f2.file_path IS NOT NULL AND f1.file_path <> f2.file_path))
                   AND id(f1) < id(f2)
-            RETURN f1.full_name as func1, f2.full_name as func2, 
+            RETURN COALESCE(f1.full_name, f1.package + '.' + f1.name, f1.name) as func1,
+                   COALESCE(f2.full_name, f2.package + '.' + f2.name, f2.name) as func2, 
                    f1.name as common_name
             LIMIT 20
         """, project=project_name).data()
@@ -101,7 +208,8 @@ class CodeGuardrails:
                   AND NOT f.name STARTS WITH 'test_'
                   AND NOT f.name STARTS WITH '_'
             OPTIONAL MATCH (f)-[:CALLS]->(callee)
-            RETURN f.full_name as function, f.module as module,
+            RETURN COALESCE(f.full_name, f.package + '.' + f.name, f.name) as function,
+                   COALESCE(f.module, f.package, f.file_path, 'unknown') as module,
                    count(callee) as outgoing_calls
             ORDER BY module
         """, project=project_name).data()
@@ -110,7 +218,7 @@ class CodeGuardrails:
             # Check if it's an entry point
             is_entry_point = (
                 'main' in func['function'] or
-                'cli' in func['module'] or
+                (func['module'] and 'cli' in func['module']) or
                 'handler' in func['function'].lower() or
                 'route' in func['function'].lower()
             )
@@ -368,6 +476,165 @@ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}
             report += "- ✅ **Good**: Minor improvements recommended\n"
             
         return report
+    
+    def _analyze_kotlin_project_health(self, project_name: str) -> Dict:
+        """Kotlin-specific health check for a project."""
+        results = {
+            'duplicates': [],
+            'unused_functions': [],
+            'strange_patterns': [],
+            'potential_risks': [],
+            'consistency_issues': [],
+            'complexity_hotspots': []
+        }
+        
+        try:
+            # Find duplicate implementations (Kotlin version)
+            duplicates = self.graph.run("""
+                MATCH (f1:Function {project: $project})
+                MATCH (f2:Function {project: $project})
+                WHERE f1.name = f2.name 
+                      AND f1.package <> f2.package
+                      AND id(f1) < id(f2)
+                RETURN f1.name as common_name,
+                       f1.package + '.' + f1.name as func1,
+                       f2.package + '.' + f2.name as func2
+                LIMIT 20
+            """, project=project_name).data()
+            
+            for dup in duplicates:
+                results['duplicates'].append({
+                    'type': 'same_name',
+                    'function1': dup['func1'],
+                    'function2': dup['func2'],
+                    'name': dup['common_name'],
+                    'severity': 'medium'
+                })
+            
+            # Find unused functions (Kotlin version)
+            unused = self.graph.run("""
+                MATCH (f:Function {project: $project})
+                WHERE NOT ()-[:CALLS]->(f)
+                      AND f.name <> '__init__'
+                      AND f.name <> 'main'
+                      AND NOT f.name STARTS WITH 'test'
+                RETURN f.package + '.' + f.name as function,
+                       f.package as package
+                LIMIT 50
+            """, project=project_name).data()
+            
+            for func in unused:
+                results['unused_functions'].append({
+                    'function': func['function'],
+                    'module': func['package'],
+                    'severity': 'medium'
+                })
+            
+            # Find complexity hotspots (Kotlin version)
+            # For now, we'll use file-level complexity since we don't have method-level complexity
+            complex_files = self.graph.run("""
+                MATCH (f:File {project: $project})
+                WHERE f.complexity > 100
+                RETURN f.path as file, f.complexity as complexity
+                ORDER BY complexity DESC
+                LIMIT 10
+            """, project=project_name).data()
+            
+            for file in complex_files:
+                results['complexity_hotspots'].append({
+                    'location': file['file'],
+                    'complexity': file['complexity'],
+                    'severity': 'high' if file['complexity'] > 200 else 'medium'
+                })
+            
+            # Detect DSL pattern issues
+            dsl_issues = self.graph.run("""
+                MATCH (d:DSLBlock {project: $project})
+                WITH d.type as dsl_type, count(d) as usage_count
+                WHERE usage_count < 3
+                RETURN dsl_type, usage_count
+            """, project=project_name).data()
+            
+            for issue in dsl_issues:
+                results['strange_patterns'].append({
+                    'type': 'underused_dsl',
+                    'pattern': issue['dsl_type'],
+                    'usage_count': issue['usage_count'],
+                    'severity': 'low'
+                })
+            
+        except Exception as e:
+            print(f"[GUARDRAILS] Error in Kotlin analysis: {e}")
+        
+        # Get codebase metrics for percentage calculations
+        metrics = self._get_codebase_metrics(project_name)
+        
+        # Calculate issue rates (percentages)
+        duplicate_rate = (len(results['duplicates']) / max(metrics['total_functions'], 1)) * 100
+        unused_rate = (len(results['unused_functions']) / max(metrics['total_functions'], 1)) * 100
+        
+        # Calculate penalty based on rates
+        penalty = 0
+        
+        # Duplicate rate penalty (max 20 points)
+        if duplicate_rate > 50:
+            penalty += 20
+        elif duplicate_rate > 30:
+            penalty += 15
+        elif duplicate_rate > 15:
+            penalty += 10
+        elif duplicate_rate > 5:
+            penalty += 5
+        
+        # Unused code rate penalty (max 15 points)
+        if unused_rate > 50:
+            penalty += 15
+        elif unused_rate > 30:
+            penalty += 10
+        elif unused_rate > 15:
+            penalty += 7
+        elif unused_rate > 5:
+            penalty += 3
+        
+        # Other issues (scaled by codebase size)
+        issue_density = (len(results['strange_patterns']) + 
+                        len(results['consistency_issues']) + 
+                        len(results['complexity_hotspots'])) / max(metrics['codebase_size'] / 100, 1)
+        
+        if issue_density > 10:
+            penalty += 15
+        elif issue_density > 5:
+            penalty += 10
+        elif issue_density > 2:
+            penalty += 5
+        
+        # Critical risks (always high penalty)
+        penalty += len(results['potential_risks']) * 10
+        
+        # Calculate final score (no negative scores)
+        results['health_score'] = max(0, 100 - penalty)
+        
+        # Add metrics to results
+        results['metrics'] = {
+            **metrics,
+            'duplicate_rate': round(duplicate_rate, 1),
+            'unused_rate': round(unused_rate, 1),
+            'issue_density': round(issue_density, 1)
+        }
+        
+        # Add health message based on score
+        if results['health_score'] < 30:
+            results['health_message'] = f"😱 Critical: Major refactoring needed (Score: {results['health_score']})"
+        elif results['health_score'] < 50:
+            results['health_message'] = f"⚠️ Warning: Several issues need attention (Score: {results['health_score']})"
+        elif results['health_score'] < 70:
+            results['health_message'] = f"🤔 Fair: Room for improvement (Score: {results['health_score']})"
+        elif results['health_score'] < 85:
+            results['health_message'] = f"👍 Good: Pretty decent codebase (Score: {results['health_score']})"
+        else:
+            results['health_message'] = f"🌟 Excellent: Great code quality! (Score: {results['health_score']})"
+        
+        return results
 
 
 def demonstrate_guardrails():

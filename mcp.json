@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mnemo": {
+      "command": "python",
+      "args": ["-m", "mnemo.mcp.cli", "serve-stdio"],
+      "env": {
+        "PYTHONPATH": "."
+      }
+    }
+  }
+}

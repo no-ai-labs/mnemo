@@ -549,18 +549,57 @@ class ToolHandler:
                     stats = {}  # Initialize stats
                     # Import analyzers
                     if language == "python":
-                        from mnemo.graph.call_graph_builder import CallGraphBuilder
-                        builder = CallGraphBuilder()
-                        builder.build_from_directory(project_path, project_name)
+                        # Check for analysis depth parameter
+                        depth = arguments.get('depth', 'complete')
                         
-                        # Get stats
-                        stats = builder.graph.run("""
-                            MATCH (f:Function {project: $project})
-                            OPTIONAL MATCH (f)-[c:CALLS]->()
-                            RETURN count(DISTINCT f) as functions, 
-                                   count(c) as calls,
-                                   count(DISTINCT f.file_path) as files
-                        """, project=project_name).data()[0]
+                        if depth != 'basic':  # Use CompletePythonAnalyzer for all non-basic analyses
+                            from mnemo.graph.complete_python_analyzer import CompletePythonAnalyzer
+                            analyzer = CompletePythonAnalyzer()
+                            
+                            # Determine analysis levels
+                            if depth == 'complete':
+                                levels = ['all']
+                            elif depth == 'deep':
+                                levels = ['basic', 'relationships']
+                            else:  # Default to complete if unknown depth specified
+                                levels = ['all']
+                            
+                            result = analyzer.analyze_complete(project_path, project_name, levels)
+                            
+                            # Extract basic stats for response
+                            basic_stats = result.get('basic', {})
+                            stats = {
+                                'functions': basic_stats.get('functions', 0),
+                                'classes': basic_stats.get('classes', 0),
+                                'files': basic_stats.get('files', 0),
+                                'methods': basic_stats.get('methods', 0),
+                                'analysis_time': result.get('total_time', 0)
+                            }
+                            
+                            # Add relationship stats if available
+                            if 'relationships' in result:
+                                stats['imports'] = result['relationships'].get('import_count', 0)
+                                stats['calls'] = result['relationships'].get('call_count', 0)
+                                stats['circular_imports'] = len(result['relationships'].get('circular_imports', []))
+                            
+                            # Add quality stats if available
+                            if 'quality' in result:
+                                stats['code_smells'] = len(result['quality'].get('code_smells', []))
+                                stats['test_coverage'] = result['quality'].get('test_coverage', {}).get('percentage', 0)
+                        else:
+                            # Use simple analyzer for basic analysis
+                            from mnemo.graph.call_graph_builder import CallGraphBuilder
+                            builder = CallGraphBuilder()
+                            builder.build_from_directory(project_path, project_name)
+                            
+                            # Get stats
+                            stats = builder.graph.run("""
+                                MATCH (f:Function {project: $project})
+                                OPTIONAL MATCH (f)-[c:CALLS]->()
+                                RETURN count(DISTINCT f) as functions, 
+                                       count(c) as calls,
+                                       count(DISTINCT f.file_path) as files
+                            """, project=project_name).data()[0]
                         
                     elif language == "kotlin":
                         # Check for analysis depth parameter
