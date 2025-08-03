@@ -32,6 +32,8 @@ htmlcov/
 *.sqlite3
 mnemo_db/
 mnemo_mcp_db/
+mnemo_clean_db/
+mnemo_split_db/
 cursor_memories/
 test_mcp_memories/
 example_db/
@@ -43,6 +45,9 @@ test_branch_db/
 test_tracking_db/
 project_context_db/
 mentat_analysis_db/
+
+# Output files
+output/
 
 # Neo4j
 docker-compose/neo4j/
