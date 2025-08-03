@@ -179,42 +179,49 @@ Health: http://0.0.0.0:3333/health
 2. Cursor 다시 실행
 
 ### 5. 연결 확인
-Cursor에서 새 채팅을 열고 다음과 같이 입력해보세요:
+Cursor에서 새 채팅을 열고 다음과 같이 자연스럽게 요청해보세요:
 
 ```
-@mnemo test
+이 프로젝트 정보를 "test_connection"이라는 이름으로 저장해줘
 ```
 
-"Mnemo MCP server is connected!" 같은 응답이 나오면 성공! 🎉
+Cursor가 자동으로 Mnemo 도구를 사용해서 저장하면 성공! 🎉
 
 ## 사용 방법
 
+> 📌 **중요**: Cursor는 대화 내용을 이해해서 자동으로 적절한 MCP 도구를 선택합니다.
+> @mnemo 같은 명령어를 직접 입력할 필요가 없어요!
+
 ### 1. 기억 저장하기
 ```
-@mnemo remember "project_setup" "이 프로젝트는 FastAPI와 PostgreSQL을 사용하는 REST API입니다"
+나: 이 프로젝트는 FastAPI와 PostgreSQL을 사용하는 REST API야. 이 정보를 "project_setup"으로 저장해줘.
+AI: 네, 프로젝트 정보를 저장했습니다. [Mnemo의 remember 도구 사용]
 ```
 
 ### 2. 기억 검색하기
 ```
-@mnemo recall "project setup"
+나: 우리 프로젝트 설정이 뭐였는지 찾아봐줘
+AI: 저장된 정보를 확인해보니, 이 프로젝트는 FastAPI와 PostgreSQL을 사용하는 REST API입니다.
 ```
 
 ### 3. 실제 대화에서 사용하기
 ```
-나: @mnemo 이 프로젝트의 기술 스택이 뭐였지?
-AI: 제가 저장된 기억을 확인해보니, 이 프로젝트는 FastAPI와 PostgreSQL을 사용하는 REST API 프로젝트입니다.
+나: 이 프로젝트의 기술 스택이 뭐였지?
+AI: [Mnemo 메모리 검색 중...] 이 프로젝트는 FastAPI와 PostgreSQL을 사용하는 REST API 프로젝트입니다.
 ```
 
 ### 4. 고급 사용법
 
-#### 태그 추가하기
+#### 태그로 정보 저장하기
 ```
-@mnemo remember "api_endpoint" "POST /users - 사용자 생성 엔드포인트" --tags "api,users,backend"
+나: "POST /users - 사용자 생성 엔드포인트"를 api, users, backend 태그와 함께 저장해줘
+AI: 엔드포인트 정보를 태그와 함께 저장했습니다.
 ```
 
 #### 특정 태그로 검색
 ```
-@mnemo search --tags "api"
+나: api 태그가 있는 정보들을 찾아줘
+AI: [검색 중...] api 태그가 있는 정보들을 찾았습니다:
 ```
 
 #### 프로젝트별 기억 관리
@@ -228,7 +235,7 @@ AI: 제가 저장된 기억을 확인해보니, 이 프로젝트는 FastAPI와 P
 - Python 가상환경이 활성화되어 있는지 확인
 - `pip list | grep mnemo`로 설치 확인
 
-### 2. Cursor에서 @mnemo가 작동하지 않음
+### 2. Cursor가 Mnemo 도구를 사용하지 않음
 - mcp.json의 Python 경로가 정확한지 확인
 - Cursor를 완전히 재시작했는지 확인
 - 터미널에서 `python -m mnemo.mcp.cli serve-fastapi` 직접 실행해보기

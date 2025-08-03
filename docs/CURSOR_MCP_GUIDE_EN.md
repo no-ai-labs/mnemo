@@ -179,42 +179,49 @@ You must fully restart Cursor to apply the settings!
 2. Start Cursor again
 
 ### 5. Verify Connection
-Open a new chat in Cursor and type:
+Open a new chat in Cursor and naturally ask:
 
 ```
-@mnemo test
+Please save this project info as "test_connection"
 ```
 
-If you see something like "Mnemo MCP server is connected!", you're all set! 🎉
+If Cursor automatically uses the Mnemo tool to save it, you're all set! 🎉
 
 ## How to Use
 
+> 📌 **Important**: Cursor understands your conversation and automatically selects the appropriate MCP tools.
+> No need to type commands like @mnemo directly!
+
 ### 1. Store Memories
 ```
-@mnemo remember "project_setup" "This project is a REST API using FastAPI and PostgreSQL"
+You: This project is a REST API using FastAPI and PostgreSQL. Please save this as "project_setup".
+AI: I've saved the project information. [Using Mnemo's remember tool]
 ```
 
 ### 2. Recall Memories
 ```
-@mnemo recall "project setup"
+You: Can you find what our project setup was?
+AI: Let me check the saved information. This project is a REST API using FastAPI and PostgreSQL.
 ```
 
 ### 3. Using in Conversations
 ```
-You: @mnemo what was the tech stack for this project?
-AI: Checking stored memories, this project is a REST API using FastAPI and PostgreSQL.
+You: What was the tech stack for this project?
+AI: [Searching Mnemo memory...] This project is a REST API using FastAPI and PostgreSQL.
 ```
 
 ### 4. Advanced Usage
 
 #### Adding Tags
 ```
-@mnemo remember "api_endpoint" "POST /users - User creation endpoint" --tags "api,users,backend"
+You: Save "POST /users - User creation endpoint" with tags api, users, and backend
+AI: I've saved the endpoint information with the specified tags.
 ```
 
 #### Search by Tags
 ```
-@mnemo search --tags "api"
+You: Find all information with the api tag
+AI: [Searching...] I found the following information with the api tag:
 ```
 
 #### Project-specific Memories
@@ -228,7 +235,7 @@ AI: Checking stored memories, this project is a REST API using FastAPI and Postg
 - Check if Python virtual environment is activated
 - Verify installation with `pip list | grep mnemo`
 
-### 2. @mnemo Not Working in Cursor
+### 2. Cursor Not Using Mnemo Tools
 - Verify Python path in mcp.json is correct
 - Ensure Cursor was fully restarted
 - Try running `python -m mnemo.mcp.cli serve-fastapi` directly in terminal
