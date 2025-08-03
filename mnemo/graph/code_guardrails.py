@@ -50,12 +50,19 @@ class CodeGuardrails:
         print(f"[GUARDRAILS] Analyzing project health: {project_name}")
         
         try:
-            # Check if this is a Kotlin project by looking for package attributes
-            is_kotlin = self.graph.run("""
-                MATCH (f:Function {project: $project})
-                WHERE f.package IS NOT NULL AND f.module IS NULL
-                RETURN count(f) > 0 as is_kotlin
-            """, project=project_name).evaluate()
+            # Check if this is a Kotlin project by checking Project node language
+            project_node = self.graph.nodes.match("Project", name=project_name).first()
+            is_kotlin = False
+            
+            if project_node and project_node.get('language') == 'kotlin':
+                is_kotlin = True
+            else:
+                # Fallback: Check if functions have package but no module
+                is_kotlin = self.graph.run("""
+                    MATCH (f:Function {project: $project})
+                    WHERE f.package IS NOT NULL AND f.module IS NULL
+                    RETURN count(f) > 0 as is_kotlin
+                """, project=project_name).evaluate()
             
             if is_kotlin:
                 print(f"[GUARDRAILS] Detected Kotlin project, using adapted queries")

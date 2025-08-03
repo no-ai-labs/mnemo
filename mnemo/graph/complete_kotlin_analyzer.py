@@ -80,7 +80,8 @@ class CompleteKotlinAnalyzer:
             "Project",
             name=project_name,
             project=project_name,
-            absolute_path=str(abs_project_path)
+            absolute_path=str(abs_project_path),
+            language="kotlin"
         )
         self.graph.merge(project_node, "Project", "name")
         
@@ -342,6 +343,7 @@ class CompleteKotlinAnalyzer:
                 name=func['name'],
                 package=result['package'],
                 file_path=str(relative_path),
+                language="kotlin",
                 project=project_name
             )
             self.graph.create(func_node)
@@ -354,6 +356,7 @@ class CompleteKotlinAnalyzer:
                 name=class_name,
                 package=result['package'],
                 file_path=str(relative_path),
+                language="kotlin",
                 project=project_name
             )
             self.graph.create(class_node)
@@ -366,6 +369,7 @@ class CompleteKotlinAnalyzer:
                 type=block['type'],
                 file_path=str(relative_path),
                 package=result['package'],
+                language="kotlin",
                 project=project_name
             )
             self.graph.create(dsl_node)

@@ -34,7 +34,8 @@ class SimpleKotlinAnalyzer:
             "Project",
             name=project_name,
             project=project_name,
-            absolute_path=str(abs_project_path)
+            absolute_path=str(abs_project_path),
+            language="kotlin"
         )
         self.graph.merge(project_node, "Project", "name")
         
