@@ -27,6 +27,17 @@ class SimpleKotlinAnalyzer:
         self.graph.run("MATCH (n {project: $project}) DETACH DELETE n", 
                       project=project_name)
         
+        # Create Project node with absolute path
+        from py2neo import Node, Relationship
+        abs_project_path = project_path.resolve()
+        project_node = Node(
+            "Project",
+            name=project_name,
+            project=project_name,
+            absolute_path=str(abs_project_path)
+        )
+        self.graph.merge(project_node, "Project", "name")
+        
         stats = {
             'files': 0,
             'classes': 0,

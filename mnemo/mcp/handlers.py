@@ -502,44 +502,141 @@ class ToolHandler:
             project_path = arguments.get("project_path")
             project_name = arguments.get("project_name")
             language = arguments.get("language", "python")
+            batch_mode = arguments.get("batch_mode", False)  # Default to sync mode for now
+            
+            print(f"[MCP DEBUG] analyze_project called:")
+            print(f"  - project_path: {project_path}")
+            print(f"  - project_name: {project_name}")
+            print(f"  - language: {language}")
+            print(f"  - batch_mode: {batch_mode}")
             
             try:
-                # Import analyzers
-                if language == "python":
-                    from mnemo.graph.call_graph_builder import CallGraphBuilder
-                    builder = CallGraphBuilder()
-                    builder.build_from_directory(project_path, project_name)
+                # Use batch analyzer for large projects
+                if batch_mode:
+                    print("[MCP DEBUG] Using batch analyzer")
+                    from mnemo.mcp.batch_analyzer import BatchProjectAnalyzer
+                    analyzer = BatchProjectAnalyzer(self.memory_client)
                     
-                    # Get stats
-                    stats = builder.graph.run("""
-                        MATCH (f:Function {project: $project})
-                        OPTIONAL MATCH (f)-[c:CALLS]->()
-                        RETURN count(DISTINCT f) as functions, 
-                               count(c) as calls,
-                               count(DISTINCT f.file_path) as files
-                    """, project=project_name).data()[0]
+                    print("[MCP DEBUG] Starting async analysis")
+                    # Run analysis with progress tracking
+                    import asyncio
                     
-                elif language == "kotlin":
-                    from mnemo.graph.kotlin_analyzer_simple import SimpleKotlinAnalyzer
-                    analyzer = SimpleKotlinAnalyzer()
-                    result = analyzer.analyze_kotlin_project(project_path, project_name)
-                    stats = {
-                        'functions': result.get('functions', 0),
-                        'calls': result.get('calls', 0),
-                        'files': result.get('files', 0)
+                    # Check if we're already in an event loop
+                    try:
+                        loop = asyncio.get_running_loop()
+                        print("[MCP DEBUG] Using existing event loop")
+                    except RuntimeError:
+                        loop = asyncio.get_event_loop()
+                        print("[MCP DEBUG] Creating new event loop")
+                    
+                    print("[MCP DEBUG] Calling analyze_project_async...")
+                    stats = await analyzer.analyze_project_async(
+                        project_path, project_name, language
+                    )
+                    print(f"[MCP DEBUG] Analysis complete: {stats}")
+                    
+                    return {
+                        "content": [{
+                            "type": "text",
+                            "text": f"Analyzed {project_name}: {stats['functions']} functions, "
+                                   f"{stats['classes']} classes, {stats['files']} files"
+                        }],
+                        "structuredContent": stats
                     }
                     
-                elif language in ["javascript", "typescript"]:
-                    from mnemo.graph.js_ts_analyzer import JSTypeScriptAnalyzer
-                    analyzer = JSTypeScriptAnalyzer()
-                    result = analyzer.analyze_frontend_project(project_path, project_name)
-                    stats = {
-                        'functions': result.get('components', 0),
-                        'calls': 0,
-                        'files': result.get('files', 0)
-                    }
+                # Original synchronous analysis (for small projects)
                 else:
-                    stats = {'functions': 0, 'calls': 0, 'files': 0}
+                    stats = {}  # Initialize stats
+                    # Import analyzers
+                    if language == "python":
+                        from mnemo.graph.call_graph_builder import CallGraphBuilder
+                        builder = CallGraphBuilder()
+                        builder.build_from_directory(project_path, project_name)
+                        
+                        # Get stats
+                        stats = builder.graph.run("""
+                            MATCH (f:Function {project: $project})
+                            OPTIONAL MATCH (f)-[c:CALLS]->()
+                            RETURN count(DISTINCT f) as functions, 
+                                   count(c) as calls,
+                                   count(DISTINCT f.file_path) as files
+                        """, project=project_name).data()[0]
+                        
+                    elif language == "kotlin":
+                        # Check for analysis depth parameter
+                        depth = arguments.get('depth', 'complete')
+                        
+                        if depth != 'basic':  # Use CompleteKotlinAnalyzer for all non-basic analyses
+                            from mnemo.graph.complete_kotlin_analyzer import CompleteKotlinAnalyzer
+                            analyzer = CompleteKotlinAnalyzer()
+                            
+                            # Determine analysis levels
+                            if depth == 'complete':
+                                levels = ['all']
+                            elif depth == 'deep':
+                                levels = ['basic', 'relationships']
+                            else:  # Default to complete if unknown depth specified
+                                levels = ['all']
+                            
+                            result = analyzer.analyze_complete(project_path, project_name, levels)
+                            
+                            # Extract basic stats for response
+                            basic_stats = result.get('basic', {})
+                            stats = {
+                                'functions': basic_stats.get('functions', 0),
+                                'classes': basic_stats.get('classes', 0),
+                                'files': basic_stats.get('files', 0),
+                                'dsl_blocks': basic_stats.get('dsl_blocks', 0),
+                                'analysis_time': result.get('total_time', 0)
+                            }
+                            
+                            # Add relationship stats if available
+                            if 'relationships' in result:
+                                stats['calls'] = result['relationships'].get('call_count', 0)
+                                stats['circular_deps'] = len(result['relationships'].get('circular_deps', []))
+                            
+                            # Add quality stats if available
+                            if 'quality' in result:
+                                stats['code_smells'] = len(result['quality'].get('code_smells', []))
+                                stats['similar_functions'] = len(result['quality'].get('similar_functions', []))
+                                
+                        else:
+                            # Use simple analyzer for basic analysis
+                            from mnemo.graph.kotlin_analyzer_simple import SimpleKotlinAnalyzer
+                            analyzer = SimpleKotlinAnalyzer()
+                            result = analyzer.analyze_kotlin_project(project_path, project_name)
+                            stats = {
+                                'functions': result.get('functions', 0),
+                                'classes': result.get('classes', 0),
+                                'calls': result.get('calls', 0),
+                                'files': result.get('files', 0)
+                            }
+                        
+                        # Save DSL patterns if found
+                        if language == "kotlin" and depth != 'basic':
+                            if 'basic' in result and 'dsl_patterns' in result['basic']:
+                                for pattern_type, count in result['basic']['dsl_patterns'].items():
+                                    if count > 0:
+                                        pattern_name = f"{project_name}_dsl_{pattern_type}"
+                                        description = f"DSL pattern '{pattern_type}' used {count} times in {project_name}"
+                                        self.memory_client.remember_code_pattern(
+                                            pattern_name=pattern_name,
+                                            code=f"// {pattern_type} DSL block\n{pattern_type} {{\n    // DSL content\n}}",
+                                            language="kotlin",
+                                            description=description
+                                        )
+                        
+                    elif language in ["javascript", "typescript"]:
+                        from mnemo.graph.js_ts_analyzer import JSTypeScriptAnalyzer
+                        analyzer = JSTypeScriptAnalyzer()
+                        result = analyzer.analyze_frontend_project(project_path, project_name)
+                        stats = {
+                            'functions': result.get('components', 0),
+                            'calls': 0,
+                            'files': result.get('files', 0)
+                        }
+                    else:
+                        stats = {'functions': 0, 'calls': 0, 'files': 0}
                 
                 result = {**stats, 'success': True}
                 
@@ -556,7 +653,7 @@ class ToolHandler:
                 "content": [
                     {
                         "type": "text",
-                        "text": f"Analyzed {project_name}: {stats['functions']} functions, {stats['calls']} calls, {stats['files']} files"
+                        "text": f"Analyzed {project_name}: {result.get('functions', 0)} functions, {result.get('calls', 0)} calls, {result.get('files', 0)} files"
                     }
                 ],
                 "structuredContent": result
@@ -567,33 +664,39 @@ class ToolHandler:
             project = arguments.get("project")
             
             try:
-                from mnemo.graph.project_context_manager import ProjectContextManager
-                manager = ProjectContextManager()
-                
+                # Use memory search for pattern finding
                 patterns = []
-                if project:
-                    found = manager.get_pattern_from_project(project, pattern)
-                    for p in found:
-                        patterns.append({
-                            'function': p['function'],
-                            'file': p['file'],
-                            'project': project
-                        })
-                else:
-                    # Search all projects
-                    from py2neo import Graph
-                    graph = Graph("bolt://localhost:7687", auth=("neo4j", "password123"))
-                    results = graph.run("""
-                        MATCH (f)
-                        WHERE (f:Function OR f:KotlinFunction OR f:KotlinClass)
-                          AND (toLower(f.name) CONTAINS toLower($pattern)
-                           OR toLower(f.full_name) CONTAINS toLower($pattern))
-                        RETURN f.full_name as function, f.file_path as file, f.project as project
-                        LIMIT 20
-                    """, pattern=pattern).data()
+                
+                # Search in stored code patterns
+                code_patterns = self.memory_client.search(
+                    query=f"code pattern {pattern}",
+                    memory_types=["code_pattern"],
+                    limit=20
+                )
+                
+                for memory in code_patterns:
+                    # Extract pattern info from memory
+                    patterns.append({
+                        'pattern_name': memory.get('key', ''),
+                        'language': memory.get('metadata', {}).get('language', 'unknown'),
+                        'description': memory.get('metadata', {}).get('description', ''),
+                        'code_snippet': memory.get('content', '')[:200] + '...' if len(memory.get('content', '')) > 200 else memory.get('content', '')
+                    })
+                
+                # Also search in general memories
+                if not patterns:
+                    general_search = self.memory_client.search(
+                        query=pattern,
+                        limit=10
+                    )
                     
-                    patterns = [{'function': r['function'], 'file': r['file'], 'project': r['project']} 
-                               for r in results]
+                    for memory in general_search:
+                        if pattern.lower() in memory.get('content', '').lower():
+                            patterns.append({
+                                'pattern_name': memory.get('key', ''),
+                                'content': memory.get('content', ''),
+                                'type': memory.get('memory_type', 'unknown')
+                            })
                 
                 return {
                     "content": [
@@ -810,7 +913,7 @@ class ToolHandler:
                         "message": str(e)
                     }
                 }
-                
+        
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
 
