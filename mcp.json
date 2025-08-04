@@ -1,18 +1,16 @@
 {
   "mcpServers": {
     "mnemo": {
-      "command": "python",
-      "args": ["-m", "mnemo.mcp.cli", "serve-stdio"],
+      "url": "http://localhost:3334/mcp",
       "env": {
-        "PYTHONPATH": "."
+        "MNEMO_AUTO_TRACKING": "true",
+        "MNEMO_TRANSPORT": "streamable"
       }
     },
-    "mnemo-streamable": {
-      "command": "python",
-      "args": ["-m", "mnemo.mcp.cli", "serve-streamable"],
+    "mnemo-fastapi": {
+      "url": "http://localhost:3333/mcp",
       "env": {
-        "PYTHONPATH": ".",
-        "MNEMO_TRANSPORT": "streamable"
+        "MNEMO_AUTO_TRACKING": "true"
       }
     }
   }

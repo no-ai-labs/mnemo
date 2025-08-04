@@ -173,29 +173,21 @@ def serve_streamable(
 
 @app.command()
 def serve_stdio():
-    """Start the stdio-based MCP server for use with Cursor."""
+    """[DEPRECATED] Use serve-streamable instead."""
     
     import sys
-    import json
-    import os
-    
-    db_path = os.getenv("MNEMO_DB_PATH", "./mnemo_mcp_db")
-    collection = os.getenv("MNEMO_COLLECTION", "cursor_memories")
     
     console.print(Panel(
-        f"🚀 Starting Mnemo STDIO MCP Server\n"
-        f"Collection: {collection}\n"
-        f"Database: {db_path}\n"
-        f"[yellow]Mode: STDIO (for Cursor)[/yellow]",
-        title="Mnemo STDIO Server",
-        border_style="blue"
+        "[yellow]⚠️  STDIO mode is deprecated![/yellow]\n\n"
+        "Modern MCP clients work better with HTTP/SSE transport.\n"
+        "Please use one of these commands instead:\n\n"
+        "[green]• python -m mnemo.mcp.cli serve-streamable[/green] (recommended)\n"
+        "[blue]• python -m mnemo.mcp.cli serve-fastapi[/blue] (legacy)\n\n"
+        "For Cursor, update your mcp.json to use:\n"
+        '  "url": "http://localhost:3334/mcp"',
+        title="STDIO Deprecated",
+        border_style="yellow"
     ), file=sys.stderr)
-    
-    # Import and run the STDIO server
-    # For now, we'll use the FastAPI server in STDIO mode
-    # TODO: Implement proper STDIO server
-    console.print("[red]STDIO mode not yet implemented![/red]", file=sys.stderr)
-    console.print("Use the FastAPI server with HTTP transport instead.", file=sys.stderr)
     sys.exit(1)
 
 
