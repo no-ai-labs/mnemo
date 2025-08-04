@@ -149,9 +149,14 @@ embeddings = MnemoEmbeddings(
 # Run in a terminal (FastAPI mode - recommended)
 python -m mnemo.mcp.cli serve-fastapi
 
+# NEW: Streamable mode with SSE support (for better compatibility)
+python -m mnemo.mcp.cli serve-streamable --port 3334
+
 # Alternative: stdio mode for direct MCP protocol
 python -m mnemo.mcp.cli serve-stdio
 ```
+
+**💡 SSE Troubleshooting**: If you encounter "Not SSE format" errors in corporate environments, use the streamable server or see [SSE Troubleshooting Guide](docs/SSE_TROUBLESHOOTING.md).
 
 2. Add to `.cursor/mcp.json`:
 ```json
@@ -163,6 +168,13 @@ python -m mnemo.mcp.cli serve-stdio
         "MNEMO_AUTO_TRACKING": "true",
         "MNEMO_TRACKING_INTERVAL": "300",
         "MNEMO_SESSION_TRACKING": "true"
+      }
+    },
+    "mnemo-streamable": {
+      "url": "http://localhost:3334/mcp",
+      "env": {
+        "MNEMO_AUTO_TRACKING": "true",
+        "MNEMO_TRANSPORT": "streamable"
       }
     }
   }

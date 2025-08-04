@@ -26,3 +26,4 @@ watchdog>=3.0.0  # For file system monitoring
 fastapi>=0.104.0  # For MCP HTTP server
 uvicorn>=0.24.0  # For running FastAPI
 pyvis>=0.3.0  # For graph visualization
+sse-starlette>=1.8.0  # For SSE support in FastAPI

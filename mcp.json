@@ -6,6 +6,14 @@
       "env": {
         "PYTHONPATH": "."
       }
+    },
+    "mnemo-streamable": {
+      "command": "python",
+      "args": ["-m", "mnemo.mcp.cli", "serve-streamable"],
+      "env": {
+        "PYTHONPATH": ".",
+        "MNEMO_TRANSPORT": "streamable"
+      }
     }
   }
 }

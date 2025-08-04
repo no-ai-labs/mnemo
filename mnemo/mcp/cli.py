@@ -142,5 +142,62 @@ def serve_fastapi(
     run_server(host=host, port=port)
 
 
+@app.command()
+def serve_streamable(
+    host: str = typer.Option("0.0.0.0", help="Host to bind to"),
+    port: int = typer.Option(3334, help="Port to bind to (default 3334 for streamable)"),
+    db_path: str = typer.Option("./mnemo_mcp_db", help="Database directory"),
+    collection: str = typer.Option("cursor_memories", help="ChromaDB collection name")
+):
+    """Start the Streamable FastAPI-based MCP server with SSE support."""
+    
+    import os
+    os.environ["MNEMO_DB_PATH"] = db_path
+    os.environ["MNEMO_COLLECTION"] = collection
+    
+    console.print(Panel(
+        f"🚀 Starting Mnemo Streamable MCP Server with SSE\n"
+        f"URL: http://{host}:{port}/mcp\n"
+        f"SSE: http://{host}:{port}/sse\n"
+        f"Health: http://{host}:{port}/health\n"
+        f"Collection: {collection}\n"
+        f"Database: {db_path}\n"
+        f"[yellow]✨ SSE Support Enabled[/yellow]",
+        title="Mnemo Streamable Server",
+        border_style="cyan"
+    ))
+    
+    from mnemo.mcp.streamable_fastapi_server import run_server
+    run_server(host=host, port=port)
+
+
+@app.command()
+def serve_stdio():
+    """Start the stdio-based MCP server for use with Cursor."""
+    
+    import sys
+    import json
+    import os
+    
+    db_path = os.getenv("MNEMO_DB_PATH", "./mnemo_mcp_db")
+    collection = os.getenv("MNEMO_COLLECTION", "cursor_memories")
+    
+    console.print(Panel(
+        f"🚀 Starting Mnemo STDIO MCP Server\n"
+        f"Collection: {collection}\n"
+        f"Database: {db_path}\n"
+        f"[yellow]Mode: STDIO (for Cursor)[/yellow]",
+        title="Mnemo STDIO Server",
+        border_style="blue"
+    ), file=sys.stderr)
+    
+    # Import and run the STDIO server
+    # For now, we'll use the FastAPI server in STDIO mode
+    # TODO: Implement proper STDIO server
+    console.print("[red]STDIO mode not yet implemented![/red]", file=sys.stderr)
+    console.print("Use the FastAPI server with HTTP transport instead.", file=sys.stderr)
+    sys.exit(1)
+
+
 if __name__ == "__main__":
     app()
